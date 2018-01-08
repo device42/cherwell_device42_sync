@@ -1,0 +1,139 @@
+<meta>
+    <settings>
+        <cherwell
+                url=""
+                user=""
+                password=""
+                client_id=""/>
+        <device42
+                url=""
+                user=""
+                password=""/>
+    </settings>
+
+
+       <tasks>
+        <task enable="false" description="Copy Servers from Device42 to Cherwell">
+            <api>
+                <target target="cherwell" method="POST" update_method="PATCH" path="/api/V1/savebusinessobjectbatch"/>
+                <resource model="device" target="device42" method="GET" extra-filter="last_updated_gt=2016-09-04 00:00" path="/api/1.0/devices/all/?is_it_blade_host=no&amp;"/>
+            </api>
+
+            <configuration-item bus-ob-id="93dada9f640056ce1dc67b4d4bb801f69104894dc8"/>
+
+            <mapping callback="from_d42" key="device_id" source="Devices">
+                <field resource="service_level" type="string" target="AssetStatus"/>
+                <field resource="tags" type="string" is-array="True" target="AssetTag"/>
+                <field resource="customer" type="string" target="AssetOwner"/>
+                <field resource="type" type="string" target="AssetType"/>
+                <field resource="tags" type="string" target="ComputerType"/>
+                <field resource="cpuspeed" type="string" target="CPUSpeed"/>
+                <field resource="notes" type="string" target="Description"/>
+                <field resource="aliases" is-array="True" type="string" target="FriendlyName"/>
+                <field resource="name" type="string" target="HostName"/>
+                <field resource="device_purchase_line_items" type="string" target="InvoiceAttached"/>
+                <field resource="ip_addresses" sub-key="ip" is-array="True" type="string" target="IPAddress6"/>
+                <field resource="ip_addresses" sub-key="ip" is-array="True" type="string" target="IPAddress"/>
+                <field resource="last_updated" type="string" target="LastModifiedDateTime"/>
+                <field resource="building" type="string" target="LocationBuilding"/>
+                <field resource="room" type="string" target="LocationRoom"/>
+                <field resource="mac_addresses" type="string" target="MACAddress"/>
+                <field resource="manufacturer" type="string" target="Manufacturer"/>
+                <field resource="hw_model" type="string" target="Model"/>
+                <field resource="cpucount" type="integer" target="NumberCPUs"/>
+                <field resource="os" type="string" target="OperatingSystem"/>
+                <field resource="category" type="string" target="OperatingSystemGroup"/>
+                <field resource="osver" type="string" target="OperatingSystemVersion"/>
+                <field resource="customer" type="string" target="OwnedBy"/>
+                <field resource="customer" type="string" target="OwnedByTeam"/>
+                <field resource="ram" type="integer" target="PhysicalMemory"/>
+                <field resource="" sub-key="line_cost" type="date" target="PurchaseDate"/>
+                <field resource="device_purchase_line_items" sub-key="line_cost" is-array="True" type="integer"
+                       target="PurchasePrice"/>
+                <field resource="device_purchase_line_items" sub-key="line_type" is-array="True" type="string"
+                       target="PurchaseType"/>
+                <field resource="service_level" type="integer" target="SelectedStatus"/>
+                <field resource="serial_no" type="string" target="SerialNumber"/>
+                <field resource="manufacturer" type="string" target="Vendor"/>
+                <field resource="device_id" type="string" target="U_device42_id"/>
+                <field resource="device_id" url="https://10.42.42.60/admin/rackraj/device/{}/" type="string" target="U_device42_url"/>
+            </mapping>
+        </task>
+        <task enable="true" description="Copy Networks from Device42 to Cherwell">
+            <api>
+                <target target="cherwell" method="POST" update_method="PATCH" path="/api/V1/savebusinessobjectbatch"/>
+                <resource model="device" target="device42" method="GET" extra-filter="last_updated_gt=2016-09-04 00:00" path="/api/1.0/devices/all/?type=physycal&amp;is_it_blade_host=yes&amp;"/>
+            </api>
+
+            <configuration-item bus-ob-id="9343f947d5000ac81406e746f0975ddeb11c184480"/>
+
+            <mapping callback="from_d42" key="device_id" source="Devices">
+                <!--<field resource="service_level" type="string" target="AssetStatus"/>-->
+                <field resource="tags" type="string" is-array="True" target="AssetTag"/>
+                <field resource="customer" type="string" target="AssetOwner"/>
+                <!--<field resource="type" type="string" target="AssetType"/>-->
+                <field resource="tags" type="string" target="ComputerType"/>
+                <field resource="cpuspeed" type="string" target="CPUSpeed"/>
+                <field resource="notes" type="string" target="Description"/>
+                <field resource="aliases" is-array="True" type="string" target="FriendlyName"/>
+                <field resource="name" type="string" target="HostName"/>
+                <field resource="device_purchase_line_items" type="string" target="InvoiceAttached"/>
+                <field resource="ip_addresses" sub-key="ip" is-array="True" type="string" target="IPAddress6"/>
+                <field resource="ip_addresses" sub-key="ip" is-array="True" type="string" target="IPAddress"/>
+                <field resource="last_updated" type="string" target="LastModifiedDateTime"/>
+                <field resource="building" type="string" target="LocationBuilding"/>
+                <field resource="room" type="string" target="LocationRoom"/>
+                <field resource="mac_addresses" type="string" target="MACAddress"/>
+                <field resource="manufacturer" type="string" target="Manufacturer"/>
+                <field resource="hw_model" type="string" target="Model"/>
+                <field resource="cpucount" type="integer" target="NumberCPUs"/>
+                <field resource="os" type="string" target="OperatingSystem"/>
+                <field resource="category" type="string" target="OperatingSystemGroup"/>
+                <field resource="osver" type="string" target="OperatingSystemVersion"/>
+                <!--<field resource="customer" type="string" target="OwnedBy"/>-->
+                <!--<field resource="customer" type="string" target="OwnedByTeam"/>-->
+                <field resource="ram" type="integer" target="PhysicalMemory"/>
+                <field resource="" sub-key="line_cost" type="date" target="PurchaseDate"/>
+                <field resource="device_purchase_line_items" sub-key="line_cost" is-array="True" type="integer"
+                       target="PurchasePrice"/>
+                <field resource="device_purchase_line_items" sub-key="line_type" is-array="True" type="string"
+                       target="PurchaseType"/>
+                <!--<field resource="service_level" type="integer" target="SelectedStatus"/>-->
+                <field resource="serial_no" type="string" target="SerialNumber"/>
+                <field resource="manufacturer" type="string" target="Vendor"/>
+                <field resource="device_id" type="string" target="U_device42_id"/>
+                <field resource="device_id" url="https://10.42.42.60/admin/rackraj/device_physical/{}/" type="string" target="U_device42_url"/>
+            </mapping>
+        </task>
+        <task enable="false" description="Copy Software Items from Device42 to Cherwell">
+            <api>
+                <target target="cherwell" method="POST" update_method="PATCH" path="/api/V1/savebusinessobjectbatch"/>
+                <resource model="software" target="device42" method="GET" extra-filter="last_updated_gt=2016-12-04 00:00" path="/api/1.0/software/?"/>
+            </api>
+
+            <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>
+
+            <mapping callback="from_d42" key="id" source="software">
+                <field resource="tags" type="string" is-array="True" target="AssetTag"/>
+                <field resource="type" type="string" target="ContractID"/>
+                <field resource="notes" type="string" target="Description"/>
+                <field resource="name" type="string" target="FriendlyName"/>
+                <field resource="vendor" type="string" target="Manufacturer"/>
+                <field resource="licensed_count" type="string" target="NumberLicenseKeys"/>
+                <field resource="license_use_count" type="string" extra-api="/api/1.0/software_details/?software_id="
+                       extra-api-additional-param="id" target="NumberLicenseKeys"/>
+                <field resource="name" type="string" target="PackageName"/>
+                <field resource="name" type="string" target="Product"/>
+                <!--<field resource="" type="date" target="PurchaseDate"/>-->
+                <!--<field resource="" type="integer" target="PurchasePrice"/>-->
+                <!--<field resource="" type="string" target="PurchaseType"/>-->
+                <field resource="id" type="string" target="SoftwareID"/>
+                <field resource="version" type="string" target="Version"/>
+                <field resource="vendor" type="string" target="Vendor"/>
+                <field resource="id" type="string" target="U_device42_id"/>
+                <field resource="id" url="https://10.42.42.60/admin/software/{}/" type="string" target="U_device42_url"/>
+            </mapping>
+        </task>
+    </tasks>
+
+</meta>

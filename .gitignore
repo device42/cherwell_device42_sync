@@ -1,0 +1,4 @@
+.env
+.idea
+mapping.xml
+__pycache__
