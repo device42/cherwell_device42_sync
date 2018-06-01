@@ -1,6 +1,8 @@
 import sys
 from importlib import reload
 
+from doql import Doql_Util
+
 reload(sys)
 
 DEBUG = True
@@ -30,6 +32,37 @@ def fill_business_object(fields, data, bus_ob_id, match_map, existing_objects_ma
                     val = val[0]
                 if match_map[field["name"]].get("sub-key"):
                     val = val[match_map[field["name"]].get("sub-key")]
+                if field["name"] == "FriendlyName" and not val:
+                    val = data["name"]
+            if match_map[field["name"]].attrib.get("url"):
+                val = match_map[field["name"]].attrib.get("url").format(data[match_map[field["name"]].attrib['resource']])
+        if val:
+            field_to_append = field.copy()
+            field_to_append["dirty"] = True
+            field_to_append["value"] = val
+            response_object["fields"].append(field_to_append)
+
+    return response_object
+
+
+def fill_business_object_doql(fields, data, bus_ob_id, match_map, existing_objects_map, mapping_key, extend=False, primary_fk=None):
+    response_object = {
+        "busObId": bus_ob_id,
+        "fields": []
+    }
+    if extend:
+        if existing_objects_map.get(str(data[primary_fk])):
+            response_object["busObRecId"] = existing_objects_map.get(str(data[primary_fk]))["busObRecId"]
+        else:
+            return None
+    else:
+        if existing_objects_map.get(str(data[mapping_key])):
+            response_object["busObRecId"] = existing_objects_map.get(str(data[mapping_key]))["busObRecId"]
+    for field in fields:
+        val = ''
+        if match_map[field["name"]].attrib['resource']:
+            if data.get(match_map[field["name"]].attrib['resource']):
+                val = data[match_map[field["name"]].attrib['resource']]
                 if field["name"] == "FriendlyName" and not val:
                     val = data["name"]
             if match_map[field["name"]].attrib.get("url"):
@@ -75,39 +108,56 @@ def get_existing_cherwell_objects_map(data):
 
 
 def perform_butch_request(bus_object, mapping, match_map, _target, _resource, source, existing_objects_map, target_api,
-                          resource_api, configuration_item):
+                          resource_api, configuration_item, doql):
     batch = {
         "saveRequests": [],
         "stopOnError": DEBUG
     }
-    for item in source[mapping.attrib['source']]:
-        batch["saveRequests"].append(
-            fill_business_object(bus_object['fields'], item, configuration_item, match_map, existing_objects_map,
-                                 mapping.attrib['key'], resource_api))
 
-    response = target_api.request(_target.attrib['path'], 'POST', batch)
+    if doql:
+        for item in source[mapping.attrib['source']]:
+            batch["saveRequests"].append(
+                fill_business_object_doql(bus_object['fields'], item, configuration_item, match_map,
+                                          existing_objects_map,
+                                          mapping.attrib['key']))
 
-    if response["hasError"] and DEBUG:
-        print(response['responses'][-1:][0]["errorMessage"])
-        return False
+            batch["saveRequests"] = list(filter(None.__ne__, batch["saveRequests"]))
 
-    offset = source.get("offset", 0)
-    limit = source.get("limit", 100)
-    if offset + limit < source["total_count"]:
-        print("Exported {} of {} records".format(offset + limit, source["total_count"]))
-        source_url = _resource.attrib['path']
-        if _resource.attrib.get("extra-filter"):
-            source_url += _resource.attrib.get("extra-filter") + "&amp;"
-        source = resource_api.request(
-            "{}offset={}".format(source_url, offset + limit),
-            _resource.attrib['method'])
-        perform_butch_request(bus_object, mapping, match_map, _target, _resource, source, existing_objects_map,
-                              target_api,
-                              resource_api, configuration_item)
+        response = target_api.request(_target.attrib['path'], 'POST', batch)
+
+        if response["hasError"] and DEBUG:
+            print(response['responses'][-1:][0]["errorMessage"])
+            return False
+    else:
+        for item in source[mapping.attrib['source']]:
+            batch["saveRequests"].append(
+                fill_business_object(bus_object['fields'], item, configuration_item, match_map,
+                                     existing_objects_map,
+                                     mapping.attrib['key'], resource_api))
+
+        response = target_api.request(_target.attrib['path'], 'POST', batch)
+
+        if response["hasError"] and DEBUG:
+            print(response['responses'][-1:][0]["errorMessage"])
+            return False
+
+            offset = source.get("offset", 0)
+            limit = source.get("limit", 100)
+            if offset + limit < source["total_count"]:
+                print("Exported {} of {} records".format(offset + limit, source["total_count"]))
+                source_url = _resource.attrib['path']
+                if _resource.attrib.get("extra-filter"):
+                    source_url += _resource.attrib.get("extra-filter") + "&amp;"
+                source = resource_api.request(
+                    "{}offset={}".format(source_url, offset + limit),
+                    _resource.attrib['method'])
+                perform_butch_request(bus_object, mapping, match_map, _target, _resource, source, existing_objects_map,
+                                      target_api,
+                                      resource_api, configuration_item, doql)
     return True
 
 
-def from_d42(source, mapping, _target, _resource, target_api, resource_api, configuration_item):
+def from_d42(source, mapping, _target, _resource, target_api, resource_api, configuration_item, doql=False):
     fields = mapping.findall('field')
     field_names = [field.attrib['target'] for field in fields]
     match_map = {field.attrib['target']: field for field in fields}
@@ -116,12 +166,21 @@ def from_d42(source, mapping, _target, _resource, target_api, resource_api, conf
         "fieldNames": field_names
     }
 
+    if doql is True:
+        doql_util = Doql_Util()
+
+        source = doql_util.csv_to_json(
+            source,
+            mapping_source=mapping.attrib['source']
+        )
+
+
     existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1, [])
     existing_objects_map = get_existing_cherwell_objects_map(existing_objects)
     bus_object = target_api.request('/api/V1/getbusinessobjecttemplate', 'POST', bus_object_config)
     success = perform_butch_request(bus_object, mapping, match_map, _target, _resource, source, existing_objects_map,
                           target_api,
-                          resource_api, configuration_item)
+                          resource_api, configuration_item, doql)
     if success:
         print("Success")
     else:

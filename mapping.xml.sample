@@ -134,6 +134,68 @@
                 <field resource="id" url="https://10.42.42.60/admin/software/{}/" type="string" target="U_device42_url"/>
             </mapping>
         </task>
+        <task enable="false" description="Copy Software Items from Device42 to Cherwell">
+               <api>
+                   <target target="cherwell" method="POST" update_method="PATCH"
+                           path="/api/V1/savebusinessobjectbatch"/>
+                   <resource
+                           model="software"
+                           target="device42"
+                           method="POST"
+                           extra-filter=""
+                           path="/services/data/v1.0/query/"
+                           doql="SELECT software_pk, view_software_v1.tags as tags, view_software_v1.name as name, software_type, licensed_count , view_vendor_v1.name as vendor FROM view_software_v1 left join view_vendor_v1 on view_software_v1.vendor_fk = view_vendor_v1.vendor_pk"
+                   ></resource>
+
+                   <resource model="software" target="device42" method="GET"
+                             extra-filter="last_updated_gt=2016-12-04 00:00" path="/api/1.0/software/?"/>
+               </api>
+
+               <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>
+
+               <mapping callback="from_d42" key="software_pk" source="software">
+                   <field resource="tags" type="string" is-array="True" target="AssetTag"/>
+                   <field resource="software_type" type="string" target="ContractID"/>
+                   <field resource="notes" type="string" target="Description"/>
+                   <field resource="name" type="string" target="FriendlyName"/>
+                   <field resource="vendor" type="string" target="Manufacturer"/>
+                   <field resource="licensed_count" type="string" target="NumberLicenseKeys"/>
+                   <field resource="name" type="string" target="PackageName"/>
+                   <field resource="name" type="string" target="Product"/>
+                   <field resource="software_pk" type="string" target="SoftwareID"/>
+                   <field resource="vendor" type="string" target="Vendor"/>
+                   <field resource="software_pk" type="string" target="U_device42_id"/>
+                   <field resource="software_pk" url="https://10.42.42.60/admin/software/{}/" type="string"
+                          target="U_device42_url"/>
+               </mapping>
+           </task>
+
+           <task enable="true" description="Extend Software Items from Device42 to Cherwell via software_detail table">
+               <api>
+                   <target target="cherwell" method="POST" update_method="PATCH"
+                           path="/api/V1/savebusinessobjectbatch"/>
+                   <resource
+                           model="software"
+                           target="device42"
+                           method="POST"
+                           extra-filter=""
+                           path="/services/data/v1.0/query/"
+                           doql="SELECT software_fk, version, license_use_count from view_softwareinuse_v1"
+                   ></resource>
+
+                   <resource model="software" target="device42" method="GET"
+                             extra-filter="last_updated_gt=2016-12-04 00:00" path="/api/1.0/software/?"/>
+               </api>
+
+               <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>
+
+               <mapping callback="from_d42" key="software_fk" source="software_details" extend="true" primary_fk="software_fk">
+                   <field resource="license_use_count" type="string" extra-api="/api/1.0/software_details/?software_id="
+                          extra-api-additional-param="id" target="NumberLicenseKeys"/>
+                   <field resource="version" type="string" target="Version"/>
+               </mapping>
+           </task>
+
     </tasks>
 
 </meta>
