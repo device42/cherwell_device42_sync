@@ -146,9 +146,6 @@
                            path="/services/data/v1.0/query/"
                            doql="SELECT software_pk, view_software_v1.tags as tags, view_software_v1.name as name, software_type, licensed_count , view_vendor_v1.name as vendor FROM view_software_v1 left join view_vendor_v1 on view_software_v1.vendor_fk = view_vendor_v1.vendor_pk"
                    ></resource>
-
-                   <resource model="software" target="device42" method="GET"
-                             extra-filter="last_updated_gt=2016-12-04 00:00" path="/api/1.0/software/?"/>
                </api>
 
                <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>
@@ -182,9 +179,6 @@
                            path="/services/data/v1.0/query/"
                            doql="SELECT software_fk, version, license_use_count from view_softwareinuse_v1"
                    ></resource>
-
-                   <resource model="software" target="device42" method="GET"
-                             extra-filter="last_updated_gt=2016-12-04 00:00" path="/api/1.0/software/?"/>
                </api>
 
                <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>

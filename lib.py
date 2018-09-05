@@ -51,12 +51,12 @@ def fill_business_object_doql(fields, data, bus_ob_id, match_map, existing_objec
         "fields": []
     }
     if extend:
-        if existing_objects_map.get(str(data[primary_fk])):
+        if data.get(primary_fk) and existing_objects_map.get(str(data[primary_fk])):
             response_object["busObRecId"] = existing_objects_map.get(str(data[primary_fk]))["busObRecId"]
         else:
             return None
     else:
-        if existing_objects_map.get(str(data[mapping_key])):
+        if data.get(mapping_key) and existing_objects_map.get(str(data[mapping_key])):
             response_object["busObRecId"] = existing_objects_map.get(str(data[mapping_key]))["busObRecId"]
     for field in fields:
         val = ''
@@ -114,6 +114,21 @@ def perform_butch_request(bus_object, mapping, match_map, _target, _resource, so
         "stopOnError": DEBUG
     }
 
+    def get_error_msg(response):
+        try:
+            error = response['responses'][-1:][0].get('errorMessage', '')
+            if not error:
+                for ve in response['responses'][-1:][0].get('fieldValidationErrors', []):
+                    if ve and ve.get('error'):
+                        error += '{}; '.format(ve.get('error'))
+
+            if error:
+                error = error.strip()
+
+            return error
+        except Exception as e:
+            return 'Unknown error'
+
     if doql:
         for item in source[mapping.attrib['source']]:
             batch["saveRequests"].append(
@@ -126,7 +141,11 @@ def perform_butch_request(bus_object, mapping, match_map, _target, _resource, so
         response = target_api.request(_target.attrib['path'], 'POST', batch)
 
         if response["hasError"] and DEBUG:
-            print(response['responses'][-1:][0]["errorMessage"])
+            print('error:', get_error_msg(response))
+            print('path:', _target.attrib['path'])
+            print('method:', 'POST')
+            print('payload:', batch)
+            print('response:', response)
             return False
     else:
         for item in source[mapping.attrib['source']]:
@@ -138,7 +157,11 @@ def perform_butch_request(bus_object, mapping, match_map, _target, _resource, so
         response = target_api.request(_target.attrib['path'], 'POST', batch)
 
         if response["hasError"] and DEBUG:
-            print(response['responses'][-1:][0]["errorMessage"])
+            print('error:', get_error_msg(response))
+            print('path:', _target.attrib['path'])
+            print('method:', 'POST')
+            print('payload:', batch)
+            print('response:', response)
             return False
 
             offset = source.get("offset", 0)

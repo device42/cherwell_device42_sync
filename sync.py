@@ -3,7 +3,9 @@ import base64
 import requests
 import urllib.parse as urllib
 import xml.etree.ElementTree as eTree
+import traceback
 import lib
+from lib import DEBUG
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -34,12 +36,9 @@ class Cherwell(Service):
         url = "%s/token" % (self.url,)
 
         response = requests.request("POST", url, data=payload, headers=headers)
-        if response.status_code == 200:
-            response_data = json.loads(response.content.decode('utf-8'))
-            self.access_token = response_data['access_token']
-        else:
-            print(response.content)
-            exit(0)
+        validate_response(response)
+        response_data = deserialize_json(response.content.decode('utf-8'))
+        self.access_token = response_data['access_token']
 
     def request(self, path, method, data=()):
         headers = {
@@ -50,10 +49,14 @@ class Cherwell(Service):
         result = {}
         if method == 'GET':
             response = requests.get(self.url + path, headers=headers, verify=False)
-            result = json.loads(response.content.decode())
         elif method == 'POST':
             response = requests.post(self.url + path, json.dumps(data), headers=headers, verify=False)
-            result = json.loads(response.content.decode())
+        else:
+            return result
+
+        validate_response(response)
+        result = deserialize_json(response.content.decode())
+
         return result
 
 
@@ -67,9 +70,9 @@ class Device42(Service):
         result = None
 
         if method == 'GET':
-            response = requests.get(self.url + path,
-                                    headers=headers, verify=False)
-            result = json.loads(response.content.decode())
+            response = requests.get(self.url + path, headers=headers, verify=False)
+            validate_response(response)
+            result = deserialize_json(response.content.decode())
         if method == 'POST' and doql is not None:
             payload = {
                 "query": doql,
@@ -81,8 +84,40 @@ class Device42(Service):
                 verify=False,
                 data=payload
             )
+            validate_response(response)
             result = response.text
+
         return result
+
+
+def deserialize_json(s):
+    try:
+        return json.loads(s)
+    except Exception as err:
+        if DEBUG:
+            print('Error upon deserialization JSON:', str(err))
+            print('Source:', str(s))
+            traceback.print_stack()
+        else:
+            print('Error upon deserialization JSON')
+        raise err
+
+
+def validate_response(response):
+    try:
+        response.raise_for_status()
+    except Exception as err:
+        print(err)
+        if DEBUG:
+            # show states of request and response
+            request_state = dict(
+                (attr, getattr(response.request, attr, None))
+                for attr in ['url', 'method', 'headers', 'body']
+            )
+            print('Request:', request_state)
+            print('Response:', response.__getstate__())
+            traceback.print_stack()
+        exit(1)
 
 
 def init_services(settings):
