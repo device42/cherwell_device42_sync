@@ -85,6 +85,8 @@ def get_existing_cherwell_objects(service, configuration_item, page, data):
     }
     bus_ib_pub_ids = service.request('/api/V1/getsearchresults', 'POST', bus_ib_pub_ids_request_data)
     data += bus_ib_pub_ids["businessObjects"]
+    print("Loaded {} of {} business objects".format(len(data), bus_ib_pub_ids["totalRows"]))
+
     if bus_ib_pub_ids["totalRows"] > page * 100:
         page += 1
         get_existing_cherwell_objects(service, configuration_item, page, data)
@@ -107,27 +109,28 @@ def get_existing_cherwell_objects_map(data):
     return result
 
 
+def get_error_msg_from_response(response):
+    try:
+        error = response['responses'][-1:][0].get('errorMessage', '')
+        if not error:
+            for ve in response['responses'][-1:][0].get('fieldValidationErrors', []):
+                if ve and ve.get('error'):
+                    error += '{}; '.format(ve.get('error'))
+
+        if error:
+            error = error.strip()
+
+        return error
+    except Exception as e:
+        return 'Unknown error'
+
+
 def perform_butch_request(bus_object, mapping, match_map, _target, _resource, source, existing_objects_map, target_api,
                           resource_api, configuration_item, doql):
     batch = {
         "saveRequests": [],
         "stopOnError": DEBUG
     }
-
-    def get_error_msg(response):
-        try:
-            error = response['responses'][-1:][0].get('errorMessage', '')
-            if not error:
-                for ve in response['responses'][-1:][0].get('fieldValidationErrors', []):
-                    if ve and ve.get('error'):
-                        error += '{}; '.format(ve.get('error'))
-
-            if error:
-                error = error.strip()
-
-            return error
-        except Exception as e:
-            return 'Unknown error'
 
     if doql:
         for item in source[mapping.attrib['source']]:
@@ -141,7 +144,7 @@ def perform_butch_request(bus_object, mapping, match_map, _target, _resource, so
         response = target_api.request(_target.attrib['path'], 'POST', batch)
 
         if response["hasError"] and DEBUG:
-            print('error:', get_error_msg(response))
+            print('error:', get_error_msg_from_response(response))
             print('path:', _target.attrib['path'])
             print('method:', 'POST')
             print('payload:', batch)
@@ -157,26 +160,26 @@ def perform_butch_request(bus_object, mapping, match_map, _target, _resource, so
         response = target_api.request(_target.attrib['path'], 'POST', batch)
 
         if response["hasError"] and DEBUG:
-            print('error:', get_error_msg(response))
+            print('error:', get_error_msg_from_response(response))
             print('path:', _target.attrib['path'])
             print('method:', 'POST')
             print('payload:', batch)
             print('response:', response)
             return False
 
-            offset = source.get("offset", 0)
-            limit = source.get("limit", 100)
-            if offset + limit < source["total_count"]:
-                print("Exported {} of {} records".format(offset + limit, source["total_count"]))
-                source_url = _resource.attrib['path']
-                if _resource.attrib.get("extra-filter"):
-                    source_url += _resource.attrib.get("extra-filter") + "&amp;"
-                source = resource_api.request(
-                    "{}offset={}".format(source_url, offset + limit),
-                    _resource.attrib['method'])
-                perform_butch_request(bus_object, mapping, match_map, _target, _resource, source, existing_objects_map,
-                                      target_api,
-                                      resource_api, configuration_item, doql)
+        offset = source.get("offset", 0)
+        limit = source.get("limit", 100)
+        if offset + limit < source["total_count"]:
+            print("Exported {} of {} records".format(offset + limit, source["total_count"]))
+            source_url = _resource.attrib['path']
+            if _resource.attrib.get("extra-filter"):
+                source_url += _resource.attrib.get("extra-filter") + "&amp;"
+            source = resource_api.request(
+                "{}offset={}".format(source_url, offset + limit),
+                _resource.attrib['method'])
+            perform_butch_request(bus_object, mapping, match_map, _target, _resource, source, existing_objects_map,
+                                  target_api,
+                                  resource_api, configuration_item, doql)
     return True
 
 
@@ -210,3 +213,37 @@ def from_d42(source, mapping, _target, _resource, target_api, resource_api, conf
         print("Something bad happened")
 
 
+def perform_delete_butch_request(_target, target_api, items_to_delete, bus_object_id):
+    batch = {
+        'deleteRequests': [],
+        'stopOnError': DEBUG
+    }
+
+    for item in items_to_delete:
+        batch['deleteRequests'].append({
+            'busObId': bus_object_id,
+            'busObPublicId': item['busObPublicId'],
+            'busObRecId': item['busObRecId'],
+        })
+
+    response = target_api.request(_target.attrib['path'], 'POST', batch)
+
+    if response['hasError'] and DEBUG:
+        print('error:', get_error_msg_from_response(response))
+        print('path:', _target.attrib['path'])
+        print('method:', 'POST')
+        print('payload:', batch)
+        print('response:', response)
+        return False
+
+    return True
+
+
+def delete_objects_from_server(_target, target_api, configuration_item):
+    existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1, [])
+    success = perform_delete_butch_request(_target, target_api, existing_objects, configuration_item)
+
+    if success:
+        print('Success')
+    else:
+        print('Something bad happened')

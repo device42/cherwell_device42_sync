@@ -147,6 +147,10 @@ def task_execute(task, services):
     method = _resource.attrib['method']
     doql = None
 
+    if _target.attrib.get('delete'):
+        lib.delete_objects_from_server(_target, target_api, configuration_item)
+        return
+
     if _resource.attrib.get("extra-filter"):
         source_url += _resource.attrib.get("extra-filter") + "&amp;"
         # source will contain the objects from the _resource endpoint

@@ -12,11 +12,12 @@
     </settings>
 
 
-       <tasks>
+    <tasks>
         <task enable="false" description="Copy Servers from Device42 to Cherwell">
             <api>
                 <target target="cherwell" method="POST" update_method="PATCH" path="/api/V1/savebusinessobjectbatch"/>
-                <resource model="device" target="device42" method="GET" extra-filter="last_updated_gt=2016-09-04 00:00" path="/api/1.0/devices/all/?is_it_blade_host=no&amp;"/>
+                <resource model="device" target="device42" method="GET" extra-filter="last_updated_gt=2016-09-04 00:00"
+                          path="/api/1.0/devices/all/?is_it_blade_host=no&amp;"/>
             </api>
 
             <configuration-item bus-ob-id="93dada9f640056ce1dc67b4d4bb801f69104894dc8"/>
@@ -56,13 +57,15 @@
                 <field resource="serial_no" type="string" target="SerialNumber"/>
                 <field resource="manufacturer" type="string" target="Vendor"/>
                 <field resource="device_id" type="string" target="U_device42_id"/>
-                <field resource="device_id" url="https://10.42.42.60/admin/rackraj/device/{}/" type="string" target="U_device42_url"/>
+                <field resource="device_id" url="https://10.42.42.60/admin/rackraj/device/{}/" type="string"
+                       target="U_device42_url"/>
             </mapping>
         </task>
         <task enable="true" description="Copy Networks from Device42 to Cherwell">
             <api>
                 <target target="cherwell" method="POST" update_method="PATCH" path="/api/V1/savebusinessobjectbatch"/>
-                <resource model="device" target="device42" method="GET" extra-filter="last_updated_gt=2016-09-04 00:00" path="/api/1.0/devices/all/?type=physycal&amp;is_it_blade_host=yes&amp;"/>
+                <resource model="device" target="device42" method="GET" extra-filter="last_updated_gt=2016-09-04 00:00"
+                          path="/api/1.0/devices/all/?type=physycal&amp;is_it_blade_host=yes&amp;"/>
             </api>
 
             <configuration-item bus-ob-id="9343f947d5000ac81406e746f0975ddeb11c184480"/>
@@ -102,13 +105,15 @@
                 <field resource="serial_no" type="string" target="SerialNumber"/>
                 <field resource="manufacturer" type="string" target="Vendor"/>
                 <field resource="device_id" type="string" target="U_device42_id"/>
-                <field resource="device_id" url="https://10.42.42.60/admin/rackraj/device_physical/{}/" type="string" target="U_device42_url"/>
+                <field resource="device_id" url="https://10.42.42.60/admin/rackraj/device_physical/{}/" type="string"
+                       target="U_device42_url"/>
             </mapping>
         </task>
         <task enable="false" description="Copy Software Items from Device42 to Cherwell">
             <api>
                 <target target="cherwell" method="POST" update_method="PATCH" path="/api/V1/savebusinessobjectbatch"/>
-                <resource model="software" target="device42" method="GET" extra-filter="last_updated_gt=2016-12-04 00:00" path="/api/1.0/software/?"/>
+                <resource model="software" target="device42" method="GET"
+                          extra-filter="last_updated_gt=2016-12-04 00:00" path="/api/1.0/software/?"/>
             </api>
 
             <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>
@@ -131,64 +136,105 @@
                 <field resource="version" type="string" target="Version"/>
                 <field resource="vendor" type="string" target="Vendor"/>
                 <field resource="id" type="string" target="U_device42_id"/>
-                <field resource="id" url="https://10.42.42.60/admin/software/{}/" type="string" target="U_device42_url"/>
+                <field resource="id" url="https://10.42.42.60/admin/software/{}/" type="string"
+                       target="U_device42_url"/>
             </mapping>
         </task>
         <task enable="false" description="Copy Software Items from Device42 to Cherwell">
-               <api>
-                   <target target="cherwell" method="POST" update_method="PATCH"
-                           path="/api/V1/savebusinessobjectbatch"/>
-                   <resource
-                           model="software"
-                           target="device42"
-                           method="POST"
-                           extra-filter=""
-                           path="/services/data/v1.0/query/"
-                           doql="SELECT software_pk, view_software_v1.tags as tags, view_software_v1.name as name, software_type, licensed_count , view_vendor_v1.name as vendor FROM view_software_v1 left join view_vendor_v1 on view_software_v1.vendor_fk = view_vendor_v1.vendor_pk"
-                   ></resource>
-               </api>
+            <api>
+                <target target="cherwell" method="POST" update_method="PATCH"
+                        path="/api/V1/savebusinessobjectbatch"/>
+                <resource
+                        model="software"
+                        target="device42"
+                        method="POST"
+                        extra-filter=""
+                        path="/services/data/v1.0/query/"
+                        doql="SELECT software_pk, view_software_v1.tags as tags, view_software_v1.name as name, software_type, licensed_count , view_vendor_v1.name as vendor FROM view_software_v1 left join view_vendor_v1 on view_software_v1.vendor_fk = view_vendor_v1.vendor_pk"
+                ></resource>
+            </api>
 
-               <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>
+            <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>
 
-               <mapping callback="from_d42" key="software_pk" source="software">
-                   <field resource="tags" type="string" is-array="True" target="AssetTag"/>
-                   <field resource="software_type" type="string" target="ContractID"/>
-                   <field resource="notes" type="string" target="Description"/>
-                   <field resource="name" type="string" target="FriendlyName"/>
-                   <field resource="vendor" type="string" target="Manufacturer"/>
-                   <field resource="licensed_count" type="string" target="NumberLicenseKeys"/>
-                   <field resource="name" type="string" target="PackageName"/>
-                   <field resource="name" type="string" target="Product"/>
-                   <field resource="software_pk" type="string" target="SoftwareID"/>
-                   <field resource="vendor" type="string" target="Vendor"/>
-                   <field resource="software_pk" type="string" target="U_device42_id"/>
-                   <field resource="software_pk" url="https://10.42.42.60/admin/software/{}/" type="string"
-                          target="U_device42_url"/>
-               </mapping>
-           </task>
+            <mapping callback="from_d42" key="software_pk" source="software">
+                <field resource="tags" type="string" is-array="True" target="AssetTag"/>
+                <field resource="software_type" type="string" target="ContractID"/>
+                <field resource="notes" type="string" target="Description"/>
+                <field resource="name" type="string" target="FriendlyName"/>
+                <field resource="vendor" type="string" target="Manufacturer"/>
+                <field resource="licensed_count" type="string" target="NumberLicenseKeys"/>
+                <field resource="name" type="string" target="PackageName"/>
+                <field resource="name" type="string" target="Product"/>
+                <field resource="software_pk" type="string" target="SoftwareID"/>
+                <field resource="vendor" type="string" target="Vendor"/>
+                <field resource="software_pk" type="string" target="U_device42_id"/>
+                <field resource="software_pk" url="https://10.42.42.60/admin/software/{}/" type="string"
+                       target="U_device42_url"/>
+            </mapping>
+        </task>
 
-           <task enable="true" description="Extend Software Items from Device42 to Cherwell via software_detail table">
-               <api>
-                   <target target="cherwell" method="POST" update_method="PATCH"
-                           path="/api/V1/savebusinessobjectbatch"/>
-                   <resource
-                           model="software"
-                           target="device42"
-                           method="POST"
-                           extra-filter=""
-                           path="/services/data/v1.0/query/"
-                           doql="SELECT software_fk, version, license_use_count from view_softwareinuse_v1"
-                   ></resource>
-               </api>
+        <task enable="true" description="Extend Software Items from Device42 to Cherwell via software_detail table">
+            <api>
+                <target target="cherwell" method="POST" update_method="PATCH"
+                        path="/api/V1/savebusinessobjectbatch"/>
+                <resource
+                        model="software"
+                        target="device42"
+                        method="POST"
+                        extra-filter=""
+                        path="/services/data/v1.0/query/"
+                        doql="SELECT software_fk, version, license_use_count from view_softwareinuse_v1"
+                ></resource>
+            </api>
 
-               <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>
+            <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>
 
-               <mapping callback="from_d42" key="software_fk" source="software_details" extend="true" primary_fk="software_fk">
-                   <field resource="license_use_count" type="string" extra-api="/api/1.0/software_details/?software_id="
-                          extra-api-additional-param="id" target="NumberLicenseKeys"/>
-                   <field resource="version" type="string" target="Version"/>
-               </mapping>
-           </task>
+            <mapping callback="from_d42" key="software_fk" source="software_details" extend="true"
+                     primary_fk="software_fk">
+                <field resource="license_use_count" type="string" extra-api="/api/1.0/software_details/?software_id="
+                       extra-api-additional-param="id" target="NumberLicenseKeys"/>
+                <field resource="version" type="string" target="Version"/>
+            </mapping>
+        </task>
+
+        <task enable="false" description="Delete Servers from Cherwell">
+            <api>
+                <target target="cherwell" method="POST" update_method="PATCH"
+                        path="/api/V1/deletebusinessobjectbatch" delete="true"/>
+                <resource model="device" target="device42" method="GET"
+                          extra-filter="last_updated_gt=2016-09-04 00:00"
+                          path="/api/1.0/devices/all/?is_it_blade_host=no&amp;limit=100&amp;"/>
+            </api>
+
+            <configuration-item bus-ob-id="93dada9f640056ce1dc67b4d4bb801f69104894dc8"/>
+            <mapping callback="from_d42" key="device_id" source="Devices"></mapping>
+        </task>
+
+        <task enable="false" description="Delete Networks from Cherwell">
+            <api>
+                <target target="cherwell" method="POST" update_method="PATCH"
+                        path="/api/V1/deletebusinessobjectbatch" delete="true"/>
+                <resource model="device" target="device42" method="GET"
+                          extra-filter="last_updated_gt=2016-09-04 00:00"
+                          path="/api/1.0/devices/all/?is_it_blade_host=no&amp;limit=100&amp;"/>
+            </api>
+
+            <configuration-item bus-ob-id="9343f947d5000ac81406e746f0975ddeb11c184480"/>
+            <mapping callback="from_d42" key="device_id" source="Devices"></mapping>
+        </task>
+
+        <task enable="false" description="Delete Software Items from Cherwell">
+            <api>
+                <target target="cherwell" method="POST" update_method="PATCH"
+                        path="/api/V1/deletebusinessobjectbatch" delete="true"/>
+                <resource model="device" target="device42" method="GET"
+                          extra-filter="last_updated_gt=2016-09-04 00:00"
+                          path="/api/1.0/devices/all/?is_it_blade_host=no&amp;limit=100&amp;"/>
+            </api>
+
+            <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>
+            <mapping callback="from_d42" key="id" source="software"></mapping>
+        </task>
 
     </tasks>
 
