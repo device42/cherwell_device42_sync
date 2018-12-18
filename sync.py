@@ -17,6 +17,7 @@ class Service:
         self.user = settings.attrib["user"]
         self.password = settings.attrib["password"]
         self.url = settings.attrib["url"]
+        self.settings = settings
 
 
 class Cherwell(Service):
@@ -39,23 +40,67 @@ class Cherwell(Service):
         validate_response(response)
         response_data = deserialize_json(response.content.decode('utf-8'))
         self.access_token = response_data['access_token']
+        self.refresh_token = response_data['refresh_token']
 
-    def request(self, path, method, data=()):
+    def refresh_access_token(self):
         headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Authorization": "Bearer {}".format(self.access_token)
+            'accept': "application/json",
+            'content-type': "application/x-www-form-urlencoded",
         }
+        data = (
+            ('client_id', self.settings.attrib['client_id']),
+            ('grant_type', 'refresh_token'),
+            ('refresh_token', self.refresh_token),
+        )
+        payload = urllib.urlencode(data, encoding='latin')
+        url = "%s/token" % (self.url,)
+
+        response = requests.request("POST", url, data=payload, headers=headers)
+        validate_response(response)
+        response_data = deserialize_json(response.content.decode('utf-8'))
+        self.access_token = response_data['access_token']
+        self.refresh_token = response_data['refresh_token']
+
+    def request(self, path, method, data=(), silent=False, return_serialized=True):
+
+        def perform_request(path, method, data=()):
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": "Bearer {}".format(self.access_token)
+            }
+
+            response = None
+            if method == 'GET':
+                response = requests.get(self.url + path, headers=headers, verify=False)
+            elif method == 'POST':
+                response = requests.post(self.url + path, json.dumps(data), headers=headers, verify=False)
+            elif method == 'DELETE':
+                response = requests.delete(self.url + path, headers=headers, verify=False)
+
+            return response
+
         result = {}
-        if method == 'GET':
-            response = requests.get(self.url + path, headers=headers, verify=False)
-        elif method == 'POST':
-            response = requests.post(self.url + path, json.dumps(data), headers=headers, verify=False)
-        else:
+
+        if method not in ('GET', 'POST', 'DELETE'):
             return result
 
-        validate_response(response)
-        result = deserialize_json(response.content.decode())
+        response = perform_request(path, method, data)
+
+        if response.status_code == 401 and self.refresh_token:
+            # reauthorize
+            self.refresh_access_token()
+            # run request again
+            response = perform_request(path, method, data)
+
+        if not silent:
+            validate_response(response)
+
+        if return_serialized:
+            if len(response.content):
+                result = deserialize_json(response.content.decode())
+        else:
+            result = response
 
         return result
 
@@ -132,7 +177,6 @@ def task_execute(task, services):
 
     _resource = task.find('api/resource')
     _target = task.find('api/target')
-    configuration_item = task.find('configuration-item').attrib['bus-ob-id']
 
     if _resource.attrib['target'] == 'cherwell':
         resource_api = services['cherwell']
@@ -141,22 +185,40 @@ def task_execute(task, services):
         resource_api = services['device42']
         target_api = services['cherwell']
 
-    mapping = task.find('mapping')
-    source_url = _resource.attrib['path']
-
     method = _resource.attrib['method']
-    doql = None
+    doql = _resource.attrib.get('doql')
 
-    if _target.attrib.get('delete'):
-        lib.delete_objects_from_server(_target, target_api, configuration_item)
-        return
-
+    source_url = _resource.attrib['path']
     if _resource.attrib.get("extra-filter"):
         source_url += _resource.attrib.get("extra-filter") + "&amp;"
         # source will contain the objects from the _resource endpoint
 
-    if _resource.attrib.get('doql'):
-        doql = _resource.attrib['doql']
+    if task.attrib.get('type') == 'affinity_group':
+        configuration_items = task.findall('configuration-item')
+
+        if doql:
+            reset_connections = task.attrib.get('reset-connections') == 'true'
+            source = resource_api.request(source_url, method, doql=doql)
+            lib.affinity_group_from_d42(
+                source,
+                _target,
+                _resource,
+                target_api,
+                resource_api,
+                configuration_items,
+                reset_connections
+            )
+            return True
+        else:
+            print("The 'doql' attribute in <resource> is required for this task")
+            exit(1)
+
+    mapping = task.find('mapping')
+    configuration_item = task.find('configuration-item').attrib['bus-ob-id']
+
+    if _target.attrib.get('delete'):
+        lib.delete_objects_from_server(_target, target_api, configuration_item)
+        return
 
     if doql is not None:
         source = resource_api.request(source_url, method, doql=doql)

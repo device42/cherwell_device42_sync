@@ -9,6 +9,7 @@ import requests
 class Doql_Util():
 
     def csv_to_json(self, doql_csv, mapping_source=None):
+        csv.field_size_limit(1000000000)
         listrows = doql_csv.split('\n')
         fields = listrows[0].split(',')
         rows = csv.reader(listrows[1:-1])

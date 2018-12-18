@@ -173,7 +173,7 @@
             </mapping>
         </task>
 
-        <task enable="true" description="Extend Software Items from Device42 to Cherwell via software_detail table">
+        <task enable="false" description="Extend Software Items from Device42 to Cherwell via software_detail table">
             <api>
                 <target target="cherwell" method="POST" update_method="PATCH"
                         path="/api/V1/savebusinessobjectbatch"/>
@@ -234,6 +234,63 @@
 
             <configuration-item bus-ob-id="9344e32d133f965792802043f4978ca3b1c18edddb"/>
             <mapping callback="from_d42" key="id" source="software"></mapping>
+        </task>
+
+        <task enable="false" type="affinity_group" reset-connections="true"
+              description="Copy Affinity Group data from Device42 to Cherwell">
+            <api>
+                <target target="cherwell" method="POST" update_method="PATCH"
+                        path="/api/V1/savebusinessobjectbatch"/>
+
+                <resource
+                        model="affinitygroup"
+                        target="device42"
+                        method="POST"
+                        extra-filter=""
+                        path="/services/data/v1.0/query/?"
+                        doql="SELECT f_extend_affinity_group_json(json) as json FROM view_affinitygroup_v1 WHERE report_type_id = 0 and last_changed > '2018-11-01'"
+                ></resource>
+                <!--
+                It's necessary to use 'f_extend_affinity_group_json(json::JSONB) as json' instead of own
+                'view_affinitygroup_v1.json' in 'doql' to get extended info about Service Instances and Application Components.
+                -->
+            </api>
+
+            <configuration-item d42-model="serviceinstance" bus-ob-id="9442246ac40b91c673fee447c8bc902991437a8ded">
+                <downstream-relationship d42-model="serviceinstance"
+                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
+
+                <mapping key="serviceinstance_pk">
+                    <field resource="name" type="string" target="FriendlyName"/>
+                    <field resource="serviceinstance_pk" type="string" target="U_device42_id"/>
+                    <field resource="serviceinstance_pk" url="https://10.42.42.60/admin/rackraj/servicedetail/{}/" type="string" target="U_device42_url"/>
+                </mapping>
+            </configuration-item>
+
+            <configuration-item d42-model="appcomp" bus-ob-id="94422728aff1c320e3dec84c52a721f365363973e2">
+                <downstream-relationship d42-model="serviceinstance"
+                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
+
+                <mapping key="appcomp_pk">
+                    <field resource="name" type="string" target="FriendlyName"/>
+                    <field resource="appcomp_pk" type="string" target="U_device42_id"/>
+                    <field resource="appcomp_pk" url="https://10.42.42.60/admin/rackraj/appcomp/{}/" type="string" target="U_device42_url"/>
+                </mapping>
+            </configuration-item>
+
+            <configuration-item d42-model="device" bus-ob-id="9343f947d5000ac81406e746f0975ddeb11c184480">
+                <downstream-relationship d42-model="serviceinstance"
+                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
+                <downstream-relationship d42-model="appcomp"
+                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
+            </configuration-item>
+
+            <configuration-item d42-model="device" bus-ob-id="93dada9f640056ce1dc67b4d4bb801f69104894dc8">
+                <downstream-relationship d42-model="serviceinstance"
+                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
+                <downstream-relationship d42-model="appcomp"
+                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
+            </configuration-item>
         </task>
 
     </tasks>
