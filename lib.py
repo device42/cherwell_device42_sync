@@ -1,6 +1,5 @@
 import collections
 import json
-import re
 import sys
 import urllib.parse as urllib
 from importlib import reload
@@ -508,47 +507,75 @@ def affinity_group_from_d42(source, _target, _resource, target_api, resource_api
         print('Removing old connections')
         service_ci.unlink_related_objects(service_ci)
 
-    # 2 prepare source data
-    nodes = []
-    edges = []
-    for row in source:
-        data = json.loads(row.get('json', {}))
-        nodes += filter(None.__ne__, map(lambda n: n.get('data'), data.get('nodes', [])))
-        edges += filter(None.__ne__, map(lambda n: n.get('data'), data.get('edges', [])))
-
-    # 3 process nodes
-    p = re.compile('^c?(?P<type>[a-zA-Z]+)id_(?P<id>[0-9]+).*$', re.I)
+    # 2 process items
     services_to_create = {}
     appcomps_to_create = {}
+    device_to_service = {}
+    device_to_appcomp = {}
+    appcomp_to_service = {}
+    service_to_service = {}
 
-    for node in nodes:
-        entity_type = node.get('entity_type')
-        entity_pk = str(node.get('entity_pk'))
+    for row in source:
+        req_props = ['dependency_device_fk', 'dependency_serviceinstance_fk', 'dependent_device_fk', 'dependent_serviceinstance_fk']
+        if not all(map(lambda key: row.get(key), req_props)):
+            continue
 
-        if entity_type == 'servicedetail':
-            if not service_ci.cherwell_obj_exists(entity_pk) and entity_pk not in services_to_create:
-                service = node.get('entity')
-                service.update({
-                    'name': node.get('name'),
-                })
-                device_ci = find_ci(service.get('device_fk'), 'device', configuration_items)
-                if device_ci:
-                    service.update({
-                        '_device_ci': device_ci
-                    })
-                    services_to_create[entity_pk] = service
+        # process nodes
+        for pref in ('dependency_', 'dependent_'):
+            service_pk = row.get(pref + service_ci.key)
+            device_pk = row.get(pref + 'device_fk')
+            appcomp_pk = row.get(pref + appcomp_ci.key)
+            service = None
+            if not service_ci.cherwell_obj_exists(service_pk) and service_pk and service_pk not in services_to_create:
+                service = {field.attrib['resource']: row.get(pref + field.attrib['resource']) for field in service_ci.match_map.values()}
+                services_to_create[service_pk] = service
 
-        if entity_type == 'appcomp':
-            if not appcomp_ci.cherwell_obj_exists(entity_pk) and entity_pk not in appcomps_to_create:
-                appcomp = node.get('entity')
-                device_ci = find_ci(appcomp.get('device_fk'), 'device', configuration_items)
-                if device_ci:
-                    appcomp.update({
-                        '_device_ci': device_ci
-                    })
-                    appcomps_to_create[entity_pk] = appcomp
+                # only for new services
+                if device_pk:
+                    conn_key = '%s:%s' % (device_pk, service_pk)
+                    if conn_key not in device_to_service:
+                        device_to_service[conn_key] = {
+                            'device': device_pk,
+                            'service': service_pk,
+                        }
 
-    # perform butch requests for creating services and appcomps
+            if not service and service_pk:
+                service = services_to_create.get(service_pk)
+
+            if appcomp_pk and not appcomp_ci.cherwell_obj_exists(appcomp_pk) and appcomp_pk not in appcomps_to_create:
+                appcomp = {field.attrib['resource']: row.get(pref + field.attrib['resource']) for field in appcomp_ci.match_map.values()}
+                appcomps_to_create[appcomp_pk] = appcomp
+
+                # only for new appcomps
+                appcomp_device_pk = row.get(pref + 'appcomp_device_fk')
+                if appcomp_device_pk:
+                    conn_key = '%s:%s' % (appcomp_device_pk, appcomp_pk)
+                    if conn_key not in device_to_appcomp:
+                        device_to_appcomp[conn_key] = {
+                            'device': appcomp_device_pk,
+                            'appcomp': appcomp_pk,
+                        }
+
+            # only for new services
+            if service and appcomp_pk:
+                conn_key = '%s:%s' % (appcomp_pk, service_pk)
+                if conn_key not in appcomp_to_service:
+                    appcomp_to_service[conn_key] = {
+                        'service': service_pk,
+                        'appcomp': appcomp_pk,
+                    }
+
+        dependency_service_pk = row.get('dependency_' + service_ci.key)
+        dependent_service_pk = row.get('dependent_' + service_ci.key)
+        if dependency_service_pk and dependent_service_pk:
+            conn_key = '%s:%s' % (dependency_service_pk, dependent_service_pk)
+            if conn_key not in service_to_service:
+                service_to_service[conn_key] = {
+                    'from': dependency_service_pk,
+                    'to': dependent_service_pk,
+                }
+
+    # perform batch requests for creating services and appcomps
     if len(appcomps_to_create) or len(services_to_create):
         print('Creating new business objects')
         if len(appcomps_to_create):
@@ -570,76 +597,81 @@ def affinity_group_from_d42(source, _target, _resource, target_api, resource_api
         service_ci.refresh_existing_cherwell_objects([CI.d42_id_field_name])
 
     # create links Device->Appcomp for new appcomps
-    if len(appcomps_to_create):
+    if len(device_to_appcomp):
         print('Creating links between new Applications and Devices')
-    for pk, d42_appcomp in appcomps_to_create.items():
-        appcomp = appcomp_ci.get_cherwell_obj(pk)
-        if not appcomp:
-            continue
 
-        d42_appcomp.get('_device_ci').link_child_obj(
-            d42_pk=d42_appcomp.get('device_fk'),
-            child_d42_pk=pk,
-            child_ci=appcomp_ci
-        )
+    for link in device_to_appcomp.values():
+        d42_device_pk = link.get('device')
+        d42_appcomp_pk = link.get('appcomp')
 
-    # create links Device->Service, Appcomp->Service for new services
-    if len(services_to_create):
-        print('Creating links between new Services, Devices and Applications')
-    for pk, d42_service in services_to_create.items():
-        service = service_ci.get_cherwell_obj(pk)
-        if not service:
-            continue
+        appcomp = appcomp_ci.get_cherwell_obj(d42_appcomp_pk)
+        device_ci = find_ci(d42_device_pk, 'device', configuration_items) if appcomp else None
 
-        # device
-        d42_service.get('_device_ci').link_child_obj(
-            d42_pk=d42_service.get('device_fk'),
-            child_d42_pk=pk,
-            child_ci=service_ci
-        )
+        if device_ci and appcomp:
+            device_ci.link_child_obj(
+                d42_pk=d42_device_pk,
+                child_d42_pk=d42_appcomp_pk,
+                child_ci=appcomp_ci
+            )
 
-        # appcomp
-        if d42_service.get('appcomp_fk'):
-            appcomp = appcomp_ci.get_cherwell_obj(d42_service.get('appcomp_fk'))
-            if not appcomp:
-                continue
+    if len(device_to_service):
+        print('Creating links between new Services and Devices')
 
+    for link in device_to_service.values():
+        d42_device_pk = link.get('device')
+        d42_service_pk = link.get('service')
+
+        service = service_ci.get_cherwell_obj(d42_service_pk)
+        device_ci = find_ci(d42_device_pk, 'device', configuration_items) if service else None
+
+        if device_ci and service:
+            device_ci.link_child_obj(
+                d42_pk=d42_device_pk,
+                child_d42_pk=d42_service_pk,
+                child_ci=service_ci
+            )
+
+    if len(appcomp_to_service):
+        print('Creating links between new Services and Application Components')
+
+    for link in appcomp_to_service.values():
+        d42_appcomp_pk = link.get('appcomp')
+        d42_service_pk = link.get('service')
+
+        service = service_ci.get_cherwell_obj(d42_service_pk)
+        appcomp = appcomp_ci.get_cherwell_obj(d42_appcomp_pk)
+
+        if appcomp and service:
             appcomp_ci.link_child_obj(
-                d42_pk=d42_service.get('appcomp_fk'),
-                child_d42_pk=pk,
+                d42_pk=d42_appcomp_pk,
+                child_d42_pk=d42_service_pk,
                 child_ci=service_ci
             )
 
     # 3 create links services -> services (process connections)
     links_num = 0
-    if len(edges):
+    if len(service_to_service):
         print('Creating links between Services')
 
         s_to_s_relationship_id = service_ci.relationships.get(service_ci.d42_model)
         if not s_to_s_relationship_id:
-            raise Exception('Relationship between {parent_ci} and {child_ci} is not configured'.format(parent_ci=service_ci,
-                                                                                                       child_ci=service_ci))
+            raise Exception(
+                'Relationship between {parent_ci} and {child_ci} is not configured'.format(parent_ci=service_ci,
+                                                                                           child_ci=service_ci)
+            )
 
-        link_tmpl = '{parent_type}_{parent_pk}__{child_type}_{child_pk}'
+        link_tmpl = '{parent_pk}:{child_pk}'
         links_cache = []
         processed_parent_services_pk = []
         d42_id_field_name = CI.d42_id_field_name.lower()
 
-        for edge in edges:
-            parent_match = p.match(edge.get('target', ''))
-            parent_type = parent_match.group('type')
-            parent_pk = parent_match.group('id')
-            if parent_type != 'servicedetail':
-                continue
+        for link in service_to_service.values():
+            parent_pk = link.get('from')
             parent = service_ci.get_cherwell_obj(parent_pk)
             if not parent:
                 continue
 
-            child_match = p.match(edge.get('source', ''))
-            child_type = child_match.group('type')
-            child_pk = child_match.group('id')
-            if child_type != 'servicedetail':
-                continue
+            child_pk = link.get('to')
             child = service_ci.get_cherwell_obj(child_pk)
             if not child:
                 continue
@@ -649,25 +681,16 @@ def affinity_group_from_d42(source, _target, _resource, target_api, resource_api
                     parent_pk not in processed_parent_services_pk and \
                     parent_pk not in services_to_create:
                 processed_parent_services_pk.append(parent_pk)
-                related_objects = service_ci.get_related_cherwell_objects(parent_pk, s_to_s_relationship_id, {'allfields': True})
+                related_objects = service_ci.get_related_cherwell_objects(parent_pk, s_to_s_relationship_id,
+                                                                          {'allfields': True})
                 for related in related_objects:
                     for field in related.get('fields', []):
                         if field.get('name').lower() == d42_id_field_name:
-                            link_key = link_tmpl.format(
-                                parent_type=parent_type,
-                                parent_pk=parent_pk,
-                                child_type='servicedetail',
-                                child_pk=field.get('value')
-                            )
+                            link_key = link_tmpl.format(parent_pk=parent_pk, child_pk=field.get('value'))
                             links_cache.append(link_key)
                             break
 
-            link_key = link_tmpl.format(
-                parent_type=parent_type,
-                parent_pk=parent_pk,
-                child_type=child_type,
-                child_pk=child_pk
-            )
+            link_key = link_tmpl.format(parent_pk=parent_pk, child_pk=child_pk)
 
             if link_key not in links_cache:
                 service_ci.link_child_obj(

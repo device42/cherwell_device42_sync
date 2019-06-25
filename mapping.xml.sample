@@ -243,17 +243,33 @@
                         path="/api/V1/savebusinessobjectbatch"/>
 
                 <resource
-                        model="affinitygroup"
                         target="device42"
                         method="POST"
                         extra-filter=""
                         path="/services/data/v1.0/query/?"
-                        doql="SELECT f_extend_affinity_group_json(json) as json FROM view_affinitygroup_v1 WHERE report_type_id = 0 and last_changed > '2018-11-01'"
+                        doql="
+select
+    da.dependency_device_fk,
+    sa.dependency_serviceinstance_fk,
+    sa.dependency_serviceinstance_name,
+    saac1.dependency_appcomp_fk,
+    saac1.dependency_appcomp_name,
+    ac1.device_fk dependency_appcomp_device_fk,
+    da.dependent_device_fk,
+    sa.dependent_serviceinstance_fk,
+    sa.dependent_serviceinstance_name,
+    saac2.dependent_appcomp_fk,
+    saac2.dependent_appcomp_name,
+    ac2.device_fk dependent_appcomp_device_fk
+from view_deviceaffinity_v2 da
+    left join view_serviceaffinity_v2 sa on sa.deviceaffinity_fk = da.deviceaffinity_pk
+    left join view_serviceaffinitydependencyappcomps_v2 saac1 on saac1.serviceaffinity_fk = sa.serviceaffinity_pk
+    left join view_appcomp_v1 ac1 on ac1.appcomp_pk = saac1.dependency_appcomp_fk
+    left join view_serviceaffinitydependentappcomps_v2 saac2 on saac2.serviceaffinity_fk = sa.serviceaffinity_pk
+    left join view_appcomp_v1 ac2 on ac2.appcomp_pk = saac2.dependent_appcomp_fk
+where da.effective_to is null and sa.effective_to is null
+"
                 ></resource>
-                <!--
-                It's necessary to use 'f_extend_affinity_group_json(json::JSONB) as json' instead of own
-                'view_affinitygroup_v1.json' in 'doql' to get extended info about Service Instances and Application Components.
-                -->
             </api>
 
             <configuration-item d42-model="serviceinstance" bus-ob-id="9442246ac40b91c673fee447c8bc902991437a8ded">

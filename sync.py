@@ -132,6 +132,12 @@ class Device42(Service):
             validate_response(response)
             result = response.text
 
+            # validate DOQL response
+            headers = result.split('\n')[0]
+            if 'error:' in headers.lower():
+                print('Error in DOQL query:', headers)
+                exit(1)
+
         return result
 
 
@@ -162,6 +168,8 @@ def validate_response(response):
             print('Request:', request_state)
             print('Response:', response.__getstate__())
             traceback.print_stack()
+        else:
+            print(response.text)
         exit(1)
 
 
@@ -239,9 +247,6 @@ def task_execute(task, services):
             configuration_item,
             doql=False
         )
-
-    # source = resource_api.request(source_url, _resource.attrib['method'])
-    # lib.from_d42(source, mapping, _target, _resource, target_api, resource_api, configuration_item)
 
 
 print('Running...')

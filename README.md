@@ -84,6 +84,6 @@ See an example in the `mapping.xml.sample` file.
 -----------------------------
 We will support any issues you run into with the script and help answer any questions you have. Please reach out to us at support@device42.com
 
-###Version
+### Version
 -----------------------------
 2.0.0.181218
