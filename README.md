@@ -72,7 +72,7 @@ See an example in the `mapping.xml.sample` file.
 ### Compatibility
 -----------------------------
 * Script runs on Linux and Windows
-* Processing Affinity Groups to Cherwell requires Device42 version 15.11.07 or higher
+* Processing Affinity Groups to Cherwell requires Device42 version 16.00 or higher (not backwards compatible)
 
 ### Info
 -----------------------------
@@ -86,4 +86,4 @@ We will support any issues you run into with the script and help answer any ques
 
 ### Version
 -----------------------------
-2.0.0.181218
+3.0.0.190801
