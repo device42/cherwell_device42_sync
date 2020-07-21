@@ -80,6 +80,13 @@ def fill_business_object_doql(fields, data, bus_ob_id, match_map, existing_objec
 
 
 def get_existing_cherwell_objects(service, configuration_item, page, data, fields=None):
+    """
+    PageNumber essentialy means RowNumber
+
+    If you have "totalRows": 100 then PageSize = 50 the logic dictates that you should have 2 pages worth of content of content
+    However PageNumber actually refers to the row number. So you will have the first 50 rows on PageNumber=1 and then 2-51 on PageNumber=2 at PageNumber = 50 it will return 50-100 then at PageNumber = 51 it will return 51-100.
+    PageNumber works more like Row Number and PageSize just dictates how many to pull from that point in the rows.
+    """
     page_size = 100
     bus_ib_pub_ids_request_data = {
         "busObId": configuration_item,
