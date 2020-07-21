@@ -99,7 +99,7 @@ def get_existing_cherwell_objects(service, configuration_item, page, data, field
     data += bus_ib_pub_ids["businessObjects"]
     print("Loaded {} of {} business objects".format(len(data), bus_ib_pub_ids["totalRows"]))
 
-    if bus_ib_pub_ids["totalRows"] > page * 100:
+    if bus_ib_pub_ids["totalRows"] > page * page_size:
         page += 1
         get_existing_cherwell_objects(service, configuration_item, page, data)
 
