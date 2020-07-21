@@ -80,11 +80,12 @@ def fill_business_object_doql(fields, data, bus_ob_id, match_map, existing_objec
 
 
 def get_existing_cherwell_objects(service, configuration_item, page, data, fields=None):
+    page_size = 100
     bus_ib_pub_ids_request_data = {
         "busObId": configuration_item,
         'includeAllFields': True,
-        "pageNumber": page,
-        "pageSize": 100
+        "pageNumber": (page - 1) * page_size + 1,
+        "pageSize": page_size
     }
 
     if isinstance(fields, collections.Iterable):
