@@ -22,7 +22,7 @@ class Service:
 
 class Cherwell(Service):
     def __init__(self, settings):
-        super(Cherwell).__init__(settings)
+        super().__init__(settings)
         headers = {
             'accept': "application/json",
             'content-type': "application/x-www-form-urlencoded",
