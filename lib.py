@@ -79,7 +79,7 @@ def fill_business_object_doql(fields, data, bus_ob_id, match_map, existing_objec
     return response_object
 
 
-def get_existing_cherwell_objects(service, configuration_item, page, data, fields=None):
+def get_existing_cherwell_objects(service, configuration_item, page, fields=None):
     """
     PageNumber essentialy means RowNumber
 
@@ -102,13 +102,14 @@ def get_existing_cherwell_objects(service, configuration_item, page, data, field
     else:
         bus_ib_pub_ids_request_data['includeAllFields'] = True
 
-    bus_ib_pub_ids = service.request('/api/V1/getsearchresults', 'POST', bus_ib_pub_ids_request_data)
-    data += bus_ib_pub_ids["businessObjects"]
-    print("Loaded {} of {} business objects".format(len(data), bus_ib_pub_ids["totalRows"]))
+    data = []
+    while page == 1 or bus_ib_pub_ids["totalRows"] > (page-1) * page_size:
+        bus_ib_pub_ids_request_data["pageNumber"] = (page-1)*page_size+1
+        bus_ib_pub_ids = service.request('/api/V1/getsearchresults', 'POST', bus_ib_pub_ids_request_data)
+        data += bus_ib_pub_ids["businessObjects"]
+        print("Loaded {} of {} business objects".format(len(data), bus_ib_pub_ids["totalRows"]))
 
-    if bus_ib_pub_ids["totalRows"] > page * page_size:
         page += 1
-        get_existing_cherwell_objects(service, configuration_item, page, data)
 
     return data
 
@@ -392,7 +393,7 @@ class CI:
             if field_id:
                 field_ids.append(field_id)
 
-        items = get_existing_cherwell_objects(self.cherwell_api, self.bus_ob_id, 1, [], field_ids)
+        items = get_existing_cherwell_objects(self.cherwell_api, self.bus_ob_id, 1, field_ids)
         self.cherwell_items = get_existing_cherwell_objects_map(items, full_objects=True)
 
     def get_related_cherwell_objects(self, d42_pk, relationship_id, params=None):
@@ -736,7 +737,7 @@ def from_d42(source, mapping, _target, _resource, target_api, resource_api, conf
         )
 
 
-    existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1, [])
+    existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1)
     existing_objects_map = get_existing_cherwell_objects_map(existing_objects)
     bus_object = target_api.request('/api/V1/getbusinessobjecttemplate', 'POST', bus_object_config)
     success = perform_butch_request(bus_object, mapping, match_map, _target, _resource, source, existing_objects_map,
