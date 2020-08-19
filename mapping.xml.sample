@@ -65,7 +65,7 @@
             <api>
                 <target target="cherwell" method="POST" update_method="PATCH" path="/api/V1/savebusinessobjectbatch"/>
                 <resource model="device" target="device42" method="GET" extra-filter="last_updated_gt=2016-09-04 00:00"
-                          path="/api/1.0/devices/all/?type=physycal&amp;is_it_blade_host=yes&amp;"/>
+                          path="/api/1.0/devices/all/?type=physical&amp;is_it_blade_host=yes&amp;"/>
             </api>
 
             <configuration-item bus-ob-id="9343f947d5000ac81406e746f0975ddeb11c184480"/>
