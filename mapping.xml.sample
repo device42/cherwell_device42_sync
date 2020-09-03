@@ -4,7 +4,8 @@
                 url=""
                 user=""
                 password=""
-                client_id=""/>
+                client_id=""
+                version="9.7.0"/>
         <device42
                 url=""
                 user=""
