@@ -24,7 +24,7 @@ class Cherwell(Service):
     def __init__(self, settings):
         super().__init__(settings)
 
-        self.settingVersion = settings.attrib["version"]
+        self.updatedVersion = settings.attrib.get("updated_page_number_version", "9.7.0")
 
         headers = {
             'accept': "application/json",
@@ -116,8 +116,8 @@ class Cherwell(Service):
 
     def is_updated_page_number_version(self):
         currentVersion = [int(i) for i in self.currentVersion.split('.')]
-        settingVersion = [int(i) for i in self.settingVersion.split('.')]
-        if currentVersion >= settingVersion:
+        updatedVersion = [int(i) for i in self.updatedVersion.split('.')]
+        if currentVersion >= updatedVersion:
             return True
         return False
 

@@ -91,12 +91,11 @@ def get_existing_cherwell_objects(service, configuration_item, page, fields=None
     bus_ib_pub_ids_request_data = {
         "busObId": configuration_item,
         'includeAllFields': True,
-        "pageNumber": (page - 1) * page_size + 1,
         "pageSize": page_size
     }
 
     if service.is_updated_page_number_version():
-        bus_ib_pub_ids_request_data['pageNumber'] = (page-1)*page_size+1
+        bus_ib_pub_ids_request_data['pageNumber'] = (page - 1) * page_size + 1
     else:
         bus_ib_pub_ids_request_data['pageNumber'] = page
 
@@ -116,9 +115,9 @@ def get_existing_cherwell_objects(service, configuration_item, page, fields=None
         page += 1
 
         if service.is_updated_page_number_version():
-            if not(bus_ib_pub_ids["totalRows"] > (page-1) * page_size):
+            if not(bus_ib_pub_ids["totalRows"] > (page - 1) * page_size):
                 break
-            bus_ib_pub_ids_request_data["pageNumber"] = (page-1)*page_size+1
+            bus_ib_pub_ids_request_data["pageNumber"] = (page - 1) * page_size + 1
         else:
             if not(bus_ib_pub_ids["totalRows"] > page * 100):
                 break
@@ -142,6 +141,7 @@ def get_existing_cherwell_objects_map(data, full_objects=False):
                         "busObPublicId": item["busObPublicId"],
                         "busObRecId": item["busObRecId"],
                     }
+    print(cnt)
     return result
 
 
@@ -416,13 +416,12 @@ class CI:
         page_size = 200
         page = 1
         def_params = {
-            'pageNumber': 1,
-            'pageSize': 200,
+            'pageSize': page_size,
             'allfields': False,
         }
 
         if self.cherwell_api.is_updated_page_number_version():
-            def_params['pageNumber'] = (page-1)*page_size+1
+            def_params['pageNumber'] = (page - 1) * page_size + 1
         else:
             def_params['pageNumber'] = page
 
@@ -455,11 +454,11 @@ class CI:
 
             page += 1
             if self.cherwell_api.is_updated_page_number_version():
-                if not(response.get('totalRecords', 0) > (page-1) * page_size):
+                if not(response.get('totalRecords', 0) > (page - 1) * page_size):
                     break
-                params["pageNumber"] = (page-1)*page_size+1
+                params["pageNumber"] = (page - 1) * page_size + 1
             else:
-                if not(response.get('totalRecords', 0) > page * 100):
+                if not(response.get('totalRecords', 0) > page * page_size):
                     break
                 params["pageNumber"] = page
 

@@ -5,7 +5,7 @@
                 user=""
                 password=""
                 client_id=""
-                version="9.7.0"/>
+                updated_page_number_version="9.7.0"/>
         <device42
                 url=""
                 user=""
