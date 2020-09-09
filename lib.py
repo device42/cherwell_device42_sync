@@ -119,7 +119,7 @@ def get_existing_cherwell_objects(service, configuration_item, page, fields=None
                 break
             bus_ib_pub_ids_request_data["pageNumber"] = (page - 1) * page_size + 1
         else:
-            if not(bus_ib_pub_ids["totalRows"] > page * 100):
+            if not(bus_ib_pub_ids["totalRows"] > page * page_size):
                 break
             bus_ib_pub_ids_request_data["pageNumber"] = page
 
