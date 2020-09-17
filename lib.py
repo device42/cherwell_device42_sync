@@ -79,13 +79,25 @@ def fill_business_object_doql(fields, data, bus_ob_id, match_map, existing_objec
     return response_object
 
 
-def get_existing_cherwell_objects(service, configuration_item, page, data, fields=None):
+def get_existing_cherwell_objects(service, configuration_item, page, fields=None):
+    """
+    PageNumber essentialy means RowNumber
+
+    If you have "totalRows": 100 then PageSize = 50 the logic dictates that you should have 2 pages worth of content of content
+    However PageNumber actually refers to the row number. So you will have the first 50 rows on PageNumber=1 and then 2-51 on PageNumber=2 at PageNumber = 50 it will return 50-100 then at PageNumber = 51 it will return 51-100.
+    PageNumber works more like Row Number and PageSize just dictates how many to pull from that point in the rows.
+    """
+    page_size = 100
     bus_ib_pub_ids_request_data = {
         "busObId": configuration_item,
         'includeAllFields': True,
-        "pageNumber": page,
-        "pageSize": 100
+        "pageSize": page_size
     }
+
+    if service.is_updated_page_number_version():
+        bus_ib_pub_ids_request_data['pageNumber'] = (page - 1) * page_size + 1
+    else:
+        bus_ib_pub_ids_request_data['pageNumber'] = page
 
     if isinstance(fields, collections.Iterable):
         fields = [str(field) for field in fields]
@@ -94,13 +106,22 @@ def get_existing_cherwell_objects(service, configuration_item, page, data, field
     else:
         bus_ib_pub_ids_request_data['includeAllFields'] = True
 
-    bus_ib_pub_ids = service.request('/api/V1/getsearchresults', 'POST', bus_ib_pub_ids_request_data)
-    data += bus_ib_pub_ids["businessObjects"]
-    print("Loaded {} of {} business objects".format(len(data), bus_ib_pub_ids["totalRows"]))
+    data = []
+    while True:
+        bus_ib_pub_ids = service.request('/api/V1/getsearchresults', 'POST', bus_ib_pub_ids_request_data)
+        data += bus_ib_pub_ids["businessObjects"]
+        print("Loaded {} of {} business objects".format(len(data), bus_ib_pub_ids["totalRows"]))
 
-    if bus_ib_pub_ids["totalRows"] > page * 100:
         page += 1
-        get_existing_cherwell_objects(service, configuration_item, page, data)
+
+        if service.is_updated_page_number_version():
+            if not(bus_ib_pub_ids["totalRows"] > (page - 1) * page_size):
+                break
+            bus_ib_pub_ids_request_data["pageNumber"] = (page - 1) * page_size + 1
+        else:
+            if not(bus_ib_pub_ids["totalRows"] > page * page_size):
+                break
+            bus_ib_pub_ids_request_data["pageNumber"] = page
 
     return data
 
@@ -384,7 +405,7 @@ class CI:
             if field_id:
                 field_ids.append(field_id)
 
-        items = get_existing_cherwell_objects(self.cherwell_api, self.bus_ob_id, 1, [], field_ids)
+        items = get_existing_cherwell_objects(self.cherwell_api, self.bus_ob_id, 1, field_ids)
         self.cherwell_items = get_existing_cherwell_objects_map(items, full_objects=True)
 
     def get_related_cherwell_objects(self, d42_pk, relationship_id, params=None):
@@ -392,11 +413,17 @@ class CI:
         if not cherwell_obj:
             raise Exception('Cherwell object not found')
 
+        page_size = 200
+        page = 1
         def_params = {
-            'pageNumber': 1,
-            'pageSize': 200,
+            'pageSize': page_size,
             'allfields': False,
         }
+
+        if self.cherwell_api.is_updated_page_number_version():
+            def_params['pageNumber'] = (page - 1) * page_size + 1
+        else:
+            def_params['pageNumber'] = page
 
         if not params:
             params = def_params
@@ -424,10 +451,16 @@ class CI:
                 raise Exception(msg)
 
             res += response.get('relatedBusinessObjects', [])
-            if response.get('totalRecords', 0) > response.get('pageNumber') * params.get('pageSize'):
-                params['pageNumber'] = response.get('pageNumber') + 1
+
+            page += 1
+            if self.cherwell_api.is_updated_page_number_version():
+                if not(response.get('totalRecords', 0) > (page - 1) * page_size):
+                    break
+                params["pageNumber"] = (page - 1) * page_size + 1
             else:
-                break
+                if not(response.get('totalRecords', 0) > page * page_size):
+                    break
+                params["pageNumber"] = page
 
         return res
 
@@ -728,7 +761,7 @@ def from_d42(source, mapping, _target, _resource, target_api, resource_api, conf
         )
 
 
-    existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1, [])
+    existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1)
     existing_objects_map = get_existing_cherwell_objects_map(existing_objects)
     bus_object = target_api.request('/api/V1/getbusinessobjecttemplate', 'POST', bus_object_config)
     success = perform_butch_request(bus_object, mapping, match_map, _target, _resource, source, existing_objects_map,
