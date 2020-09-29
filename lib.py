@@ -79,7 +79,32 @@ def fill_business_object_doql(fields, data, bus_ob_id, match_map, existing_objec
     return response_object
 
 
-def get_existing_cherwell_objects(service, configuration_item, page, fields=None):
+def get_existing_cherwell_objects_from_parent(service, configuration_item, page, parent_bus_ob_id, child_field_id, parent_field, fields=None):
+    parent_data = get_existing_cherwell_objects(service, parent_bus_ob_id, page)
+
+    data = []
+    for parent in parent_data:
+        parent_value = None
+        for field in parent["fields"]:
+            if field['name'] == parent_field:
+                parent_value = field['value']
+                break
+        filters = [
+            {
+                "fieldId": child_field_id,
+                "operator": "=",
+                "value": parent_value
+            }
+        ]
+        if parent_value is None or parent_value == '':
+            continue
+        sub_data = get_existing_cherwell_objects(service, configuration_item, page, fields, filters)
+        data += sub_data
+
+    return data
+
+
+def get_existing_cherwell_objects(service, configuration_item, page, fields=None, filters=None):
     """
     PageNumber essentialy means RowNumber
 
@@ -93,6 +118,8 @@ def get_existing_cherwell_objects(service, configuration_item, page, fields=None
         'includeAllFields': True,
         "pageSize": page_size
     }
+    if filters is not None:
+        bus_ib_pub_ids_request_data["filters"] = filters
 
     if service.is_updated_page_number_version():
         bus_ib_pub_ids_request_data['pageNumber'] = (page - 1) * page_size + 1
@@ -112,15 +139,15 @@ def get_existing_cherwell_objects(service, configuration_item, page, fields=None
         data += bus_ib_pub_ids["businessObjects"]
         print("Loaded {} of {} business objects".format(len(data), bus_ib_pub_ids["totalRows"]))
 
-        page += 1
-
         if service.is_updated_page_number_version():
+            page += 1
             if not(bus_ib_pub_ids["totalRows"] > (page - 1) * page_size):
                 break
             bus_ib_pub_ids_request_data["pageNumber"] = (page - 1) * page_size + 1
         else:
             if not(bus_ib_pub_ids["totalRows"] > page * page_size):
                 break
+            page += 1
             bus_ib_pub_ids_request_data["pageNumber"] = page
 
     return data
@@ -452,14 +479,15 @@ class CI:
 
             res += response.get('relatedBusinessObjects', [])
 
-            page += 1
             if self.cherwell_api.is_updated_page_number_version():
-                if not(response.get('totalRecords', 0) > (page - 1) * page_size):
+                page += 1
+                if not(response.get('totalRecords', 0) > (page-1) * page_size):
                     break
                 params["pageNumber"] = (page - 1) * page_size + 1
             else:
                 if not(response.get('totalRecords', 0) > page * page_size):
                     break
+                page += 1
                 params["pageNumber"] = page
 
         return res
@@ -760,8 +788,15 @@ def from_d42(source, mapping, _target, _resource, target_api, resource_api, conf
             mapping_source=mapping.attrib['source']
         )
 
+    parent_bus_ob_id = mapping.attrib.get('parent_bus_ob_id', None)
+    child_field_id = mapping.attrib.get('child_field_id', None)
+    parent_field = mapping.attrib.get('parent_field', None)
 
-    existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1)
+    if parent_bus_ob_id is not None and child_field_id is not None and parent_field is not None:
+        existing_objects = get_existing_cherwell_objects_from_parent(target_api, configuration_item, 1,
+                                                     parent_bus_ob_id=parent_bus_ob_id, child_field_id=child_field_id, parent_field=parent_field)
+    else:
+        existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1)
     existing_objects_map = get_existing_cherwell_objects_map(existing_objects)
     bus_object = target_api.request('/api/V1/getbusinessobjecttemplate', 'POST', bus_object_config)
     success = perform_butch_request(bus_object, mapping, match_map, _target, _resource, source, existing_objects_map,
