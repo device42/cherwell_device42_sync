@@ -5,11 +5,15 @@
                 user=""
                 password=""
                 client_id=""
-                updated_page_number_version="9.7.0"/>
+                updated_page_number_version="9.7.0"
+                ssl_verify="false"
+		/>
         <device42
                 url=""
                 user=""
-                password=""/>
+                password=""
+                ssl_verify="false"
+		/>
     </settings>
 
 
