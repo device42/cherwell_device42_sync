@@ -793,10 +793,10 @@ def from_d42(source, mapping, _target, _resource, target_api, resource_api, conf
     parent_field = mapping.attrib.get('parent_field', None)
 
     if parent_bus_ob_id is not None and parent_bus_ob_id != "" and child_field_id is not None and parent_field is not None:
-        parent_bus_ob_ids = parent_bus_ob_id.split(",")
+        parent_bus_ob_ids = [bus_ob_id.strip() for bus_ob_id in parent_bus_ob_id.split(",")]
         existing_objects = []
         for parent_bus_ob_id in parent_bus_ob_ids:
-            if parent_bus_ob_id.strip() == "":
+            if parent_bus_ob_id == "":
                 continue
             existing_objects += get_existing_cherwell_objects_from_parent(target_api, configuration_item, 1,
                                                      parent_bus_ob_id=parent_bus_ob_id, child_field_id=child_field_id, parent_field=parent_field)
