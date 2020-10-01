@@ -3,6 +3,7 @@ import json
 import sys
 import urllib.parse as urllib
 from importlib import reload
+import copy
 
 from doql import Doql_Util
 
@@ -79,10 +80,11 @@ def fill_business_object_doql(fields, data, bus_ob_id, match_map, existing_objec
     return response_object
 
 
-def get_existing_cherwell_objects_from_parent(service, configuration_item, page, parent_bus_ob_id, child_field_id, parent_field, fields=None):
+def get_existing_cherwell_objects_from_parent(service, configuration_item, page, sources, parent_bus_ob_id, child_field_id, parent_field, parent_key, fields=None):
     parent_data = get_existing_cherwell_objects(service, parent_bus_ob_id, page)
 
     data = []
+    parent_field_values = []
     for parent in parent_data:
         parent_value = None
         for field in parent["fields"]:
@@ -98,10 +100,16 @@ def get_existing_cherwell_objects_from_parent(service, configuration_item, page,
         ]
         if parent_value is None or parent_value == '':
             continue
+        parent_field_values.append(parent_value)
         sub_data = get_existing_cherwell_objects(service, configuration_item, page, fields, filters)
         data += sub_data
 
-    return data
+    new_sources = []
+    for source in sources:
+        if source[parent_key] in parent_field_values:
+            new_sources.append(source)
+
+    return data, new_sources
 
 
 def get_existing_cherwell_objects(service, configuration_item, page, fields=None, filters=None):
@@ -791,15 +799,22 @@ def from_d42(source, mapping, _target, _resource, target_api, resource_api, conf
     parent_bus_ob_id = mapping.attrib.get('parent_bus_ob_id', None)
     child_field_id = mapping.attrib.get('child_field_id', None)
     parent_field = mapping.attrib.get('parent_field', None)
+    parent_key = mapping.attrib.get('parent_key', None)
 
     if parent_bus_ob_id is not None and parent_bus_ob_id != "" and child_field_id is not None and parent_field is not None:
         parent_bus_ob_ids = [bus_ob_id.strip() for bus_ob_id in parent_bus_ob_id.split(",")]
         existing_objects = []
+        new_source = copy.deepcopy(source)
+        new_source[mapping.attrib["source"]] = []
         for parent_bus_ob_id in parent_bus_ob_ids:
             if parent_bus_ob_id == "":
                 continue
-            existing_objects += get_existing_cherwell_objects_from_parent(target_api, configuration_item, 1,
-                                                     parent_bus_ob_id=parent_bus_ob_id, child_field_id=child_field_id, parent_field=parent_field)
+            sub_existing_objects, sub_source = get_existing_cherwell_objects_from_parent(target_api, configuration_item, 1, sources=source[mapping.attrib["source"]],
+                                                     parent_bus_ob_id=parent_bus_ob_id, child_field_id=child_field_id, parent_field=parent_field, parent_key=parent_key)
+
+            existing_objects += sub_existing_objects
+            new_source[mapping.attrib["source"]] += new_source
+        source = new_source
     else:
         existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1)
     existing_objects_map = get_existing_cherwell_objects_map(existing_objects)
