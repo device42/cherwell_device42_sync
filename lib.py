@@ -801,7 +801,8 @@ def from_d42(source, mapping, _target, _resource, target_api, resource_api, conf
     parent_field = mapping.attrib.get('parent_field', None)
     parent_key = mapping.attrib.get('parent_key', None)
 
-    if parent_bus_ob_id is not None and parent_bus_ob_id != "" and child_field_id is not None and parent_field is not None:
+    if parent_bus_ob_id is not None and parent_bus_ob_id != "" and \
+                    child_field_id is not None and parent_field is not None and parent_key is not None:
         parent_bus_ob_ids = [bus_ob_id.strip() for bus_ob_id in parent_bus_ob_id.split(",")]
         existing_objects = []
         new_source = copy.deepcopy(source)
