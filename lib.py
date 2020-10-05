@@ -814,7 +814,7 @@ def from_d42(source, mapping, _target, _resource, target_api, resource_api, conf
                                                      parent_bus_ob_id=parent_bus_ob_id, child_field_id=child_field_id, parent_field=parent_field, parent_key=parent_key)
 
             existing_objects += sub_existing_objects
-            new_source[mapping.attrib["source"]] += new_source
+            new_source[mapping.attrib["source"]] += sub_source
         source = new_source
     else:
         existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1)
