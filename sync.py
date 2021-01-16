@@ -17,6 +17,8 @@ class Service:
         self.user = settings.attrib["user"]
         self.password = settings.attrib["password"]
         self.url = settings.attrib["url"]
+        ssl_verify = settings.attrib.get("ssl_verify", 'false')
+        self.ssl_verify = False if ssl_verify == 'false' else True
         self.settings = settings
 
 
@@ -33,7 +35,7 @@ class Cherwell(Service):
 
         url = "%s/api/V1/serviceinfo" % (self.url,)
 
-        response = requests.request("GET", url, headers=headers)
+        response = requests.request("GET", url, headers=headers, verify=self.ssl_verify)
         response_data = deserialize_json(response.content.decode('utf-8'))
         self.currentVersion = response_data['apiVersion']
 
@@ -46,7 +48,7 @@ class Cherwell(Service):
         payload = urllib.urlencode(data, encoding='latin')
         url = "%s/token" % (self.url,)
 
-        response = requests.request("POST", url, data=payload, headers=headers)
+        response = requests.request("POST", url, data=payload, headers=headers, verify=self.ssl_verify)
         validate_response(response)
         response_data = deserialize_json(response.content.decode('utf-8'))
         self.access_token = response_data['access_token']
@@ -65,7 +67,7 @@ class Cherwell(Service):
         payload = urllib.urlencode(data, encoding='latin')
         url = "%s/token" % (self.url,)
 
-        response = requests.request("POST", url, data=payload, headers=headers)
+        response = requests.request("POST", url, data=payload, headers=headers, verify=self.ssl_verify)
         validate_response(response)
         response_data = deserialize_json(response.content.decode('utf-8'))
         self.access_token = response_data['access_token']
@@ -82,11 +84,11 @@ class Cherwell(Service):
 
             response = None
             if method == 'GET':
-                response = requests.get(self.url + path, headers=headers, verify=False)
+                response = requests.get(self.url + path, headers=headers, verify=self.ssl_verify)
             elif method == 'POST':
-                response = requests.post(self.url + path, json.dumps(data), headers=headers, verify=False)
+                response = requests.post(self.url + path, json.dumps(data), headers=headers, verify=self.ssl_verify)
             elif method == 'DELETE':
-                response = requests.delete(self.url + path, headers=headers, verify=False)
+                response = requests.delete(self.url + path, headers=headers, verify=self.ssl_verify)
 
             return response
 
@@ -132,7 +134,7 @@ class Device42(Service):
         result = None
 
         if method == 'GET':
-            response = requests.get(self.url + path, headers=headers, verify=False)
+            response = requests.get(self.url + path, headers=headers, verify=self.ssl_verify)
             validate_response(response)
             result = deserialize_json(response.content.decode())
         if method == 'POST' and doql is not None:
@@ -143,7 +145,7 @@ class Device42(Service):
             response = requests.post(
                 self.url + path,
                 headers=headers,
-                verify=False,
+                verify=self.ssl_verify,
                 data=payload
             )
             validate_response(response)
