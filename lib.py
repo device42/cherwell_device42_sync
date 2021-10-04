@@ -41,7 +41,7 @@ def fill_business_object(fields, data, bus_ob_id, match_map, existing_objects_ma
                     if match_map[field["name"]].get("is-map-all"):
                         val = ",".join([val1[match_map[field["name"]].get("sub-key")] for val1 in val])
                     else:
-                        val = val[match_map[field["name"]].get("sub-key")]
+                        val = None if val is None else val[match_map[field["name"]].get("sub-key")]
                 if field["name"] == "FriendlyName" and not val:
                     val = data["name"]
             if match_map[field["name"]].attrib.get("url"):
@@ -949,6 +949,9 @@ def perform_delete_butch_request(_target, target_api, items_to_delete, bus_objec
         'stopOnError': DEBUG
     }
 
+    if len(items_to_delete) == 0:
+        return True
+
     for item in items_to_delete:
         batch['deleteRequests'].append({
             'busObId': bus_object_id,
@@ -958,7 +961,7 @@ def perform_delete_butch_request(_target, target_api, items_to_delete, bus_objec
 
     response = target_api.request(_target.attrib['path'], 'POST', batch)
 
-    if response['hasError'] and DEBUG:
+    if 'hasError' in response and response['hasError'] and DEBUG:
         print('error:', get_error_msg_from_response(response))
         print('path:', _target.attrib['path'])
         print('method:', 'POST')

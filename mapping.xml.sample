@@ -43,7 +43,7 @@
                 <field resource="last_updated" type="string" target="LastModifiedDateTime"/>
                 <field resource="building" type="string" target="LocationBuilding"/>
                 <field resource="room" type="string" target="LocationRoom"/>
-                <field resource="mac_addresses" type="string" target="MACAddress"/>
+                <field resource="mac_addresses" is-array="True" sub-key="mac" type="string" target="MACAddress"/>
                 <field resource="manufacturer" type="string" target="Manufacturer"/>
                 <field resource="hw_model" type="string" target="Model"/>
                 <field resource="cpucount" type="integer" target="NumberCPUs"/>
@@ -91,7 +91,7 @@
                 <field resource="last_updated" type="string" target="LastModifiedDateTime"/>
                 <field resource="building" type="string" target="LocationBuilding"/>
                 <field resource="room" type="string" target="LocationRoom"/>
-                <field resource="mac_addresses" type="string" target="MACAddress"/>
+                <field resource="mac_addresses" is-array="True" sub-key="mac" type="string" target="MACAddress"/>
                 <field resource="manufacturer" type="string" target="Manufacturer"/>
                 <field resource="hw_model" type="string" target="Model"/>
                 <field resource="cpucount" type="integer" target="NumberCPUs"/>
