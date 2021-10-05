@@ -5,11 +5,15 @@
                 user=""
                 password=""
                 client_id=""
-                updated_page_number_version="9.7.0"/>
+                updated_page_number_version="9.7.0"
+                ssl_verify="false"
+		/>
         <device42
                 url=""
                 user=""
-                password=""/>
+                password=""
+                ssl_verify="false"
+		/>
     </settings>
 
 
@@ -39,7 +43,7 @@
                 <field resource="last_updated" type="string" target="LastModifiedDateTime"/>
                 <field resource="building" type="string" target="LocationBuilding"/>
                 <field resource="room" type="string" target="LocationRoom"/>
-                <field resource="mac_addresses" type="string" target="MACAddress"/>
+                <field resource="mac_addresses" is-array="True" sub-key="mac" type="string" target="MACAddress"/>
                 <field resource="manufacturer" type="string" target="Manufacturer"/>
                 <field resource="hw_model" type="string" target="Model"/>
                 <field resource="cpucount" type="integer" target="NumberCPUs"/>
@@ -62,7 +66,7 @@
                        target="U_device42_url"/>
             </mapping>
         </task>
-        <task enable="true" description="Copy Networks from Device42 to Cherwell">
+        <task enable="false" description="Copy Networks from Device42 to Cherwell">
             <api>
                 <target target="cherwell" method="POST" update_method="PATCH" path="/api/V1/savebusinessobjectbatch"/>
                 <resource model="device" target="device42" method="GET" extra-filter="last_updated_gt=2016-09-04 00:00"
@@ -87,7 +91,7 @@
                 <field resource="last_updated" type="string" target="LastModifiedDateTime"/>
                 <field resource="building" type="string" target="LocationBuilding"/>
                 <field resource="room" type="string" target="LocationRoom"/>
-                <field resource="mac_addresses" type="string" target="MACAddress"/>
+                <field resource="mac_addresses" is-array="True" sub-key="mac" type="string" target="MACAddress"/>
                 <field resource="manufacturer" type="string" target="Manufacturer"/>
                 <field resource="hw_model" type="string" target="Model"/>
                 <field resource="cpucount" type="integer" target="NumberCPUs"/>
@@ -171,6 +175,41 @@
                 <field resource="software_pk" type="string" target="U_device42_id"/>
                 <field resource="software_pk" url="https://10.42.42.60/admin/software/{}/" type="string"
                        target="U_device42_url"/>
+            </mapping>
+        </task>
+
+		<task enable="false" description="Extend Software to Servers and Computer Items from Device42 to Cherwell via software_detail table">
+            <api>
+                <target target="cherwell" method="POST" update_method="PATCH"
+                        path="/api/V1/savebusinessobjectbatch"/>
+                <resource
+                        model="software"
+                        target="device42"
+                        method="POST"
+                        extra-filter=""
+                        path="/services/data/v1.0/query/"
+                        doql="select siu.softwareinuse_pk, siu.software_fk, sw.name, siu.version, siu.license_use_count, d.device_pk, d.serial_no from view_softwareinuse_v1 as siu inner join view_device_v1 d on siu.device_fk = d.device_pk inner join view_software_v1 as sw on siu.software_fk = sw.software_pk"
+                ></resource>
+            </api>
+
+            <configuration-item bus-ob-id="937adc7fe7c94907145578485f80fddbda9dffabf0"/>
+
+            <mapping callback="from_d42" key="softwareinuse_pk" source="software_details" extend="true"
+                     primary_fk="softwareinuse_pk"
+					parent_bus_ob_id="93dada9f640056ce1dc67b4d4bb801f69104894dc8, 9343f882f2b2ae64b1990c41c9bb68410bdbc23528"
+					child_field_id="BO:937adc7fe7c94907145578485f80fddbda9dffabf0,FI:946305831cdf3769a0f30942688d2656ba6675f3f5"
+					parent_field="U_device42_id"
+					parent_key="device_pk"
+                     sort_field_id="BO:937adc7fe7c94907145578485f80fddbda9dffabf0,FI:94624a81a5459c41e01b474368a9c6f1501d15f0a0"
+                >
+                <field resource="serial_no" type="string" target="AssetTag"/>
+                <field resource="device_pk" type="string" target="D42_Device_ID"/>
+                <!--<field resource="license_use_count" type="string" extra-api="/api/1.0/software_details/?software_id="
+                       extra-api-additional-param="id" target="NumberLicenseKeys"/>-->
+                <field resource="version" type="string" target="Version"/>
+                <field resource="name" type="string" target="FriendlyName"/>
+                <field resource="name" type="string" target="Product"/>
+                <field resource="softwareinuse_pk" type="string" target="U_device42_id"/>
             </mapping>
         </task>
 

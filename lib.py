@@ -3,6 +3,7 @@ import json
 import sys
 import urllib.parse as urllib
 from importlib import reload
+import copy
 
 from doql import Doql_Util
 
@@ -32,9 +33,15 @@ def fill_business_object(fields, data, bus_ob_id, match_map, existing_objects_ma
             if data.get(match_map[field["name"]].attrib['resource']):
                 val = data[match_map[field["name"]].attrib['resource']]
                 if match_map[field["name"]].get("is-array") and val:
-                    val = val[0]
+                    if match_map[field["name"]].get("is-map-all"):
+                        val = val
+                    else:
+                        val = val[0]
                 if match_map[field["name"]].get("sub-key"):
-                    val = val[match_map[field["name"]].get("sub-key")]
+                    if match_map[field["name"]].get("is-map-all"):
+                        val = ",".join([val1[match_map[field["name"]].get("sub-key")] for val1 in val])
+                    else:
+                        val = None if val is None else val[match_map[field["name"]].get("sub-key")]
                 if field["name"] == "FriendlyName" and not val:
                     val = data["name"]
             if match_map[field["name"]].attrib.get("url"):
@@ -79,7 +86,78 @@ def fill_business_object_doql(fields, data, bus_ob_id, match_map, existing_objec
     return response_object
 
 
-def get_existing_cherwell_objects(service, configuration_item, page, fields=None):
+def get_existing_cherwell_objects_from_parent(service, configuration_item, page, sources, parent_bus_ob_id, child_field_id, parent_field, parent_key, sort_field_id=None, fields=None):
+    if DEBUG:
+        print("get_existing_cherwell_objects_from_parent")
+        print("parent_bus_ob_id = %s" % parent_bus_ob_id)
+        print("child_field_id = %s" % child_field_id)
+        print("parent_field = %s" % parent_field)
+        print("parent_key = %s" % parent_key)
+
+    parent_data = get_existing_cherwell_objects(service, parent_bus_ob_id, page)
+
+    data = []
+    parent_field_values = []
+    for parent in parent_data:
+        parent_value = None
+        for field in parent["fields"]:
+            if field['name'] == parent_field:
+                parent_value = field['value']
+                break
+        filters = [
+            {
+                "fieldId": child_field_id,
+                "operator": "=",
+                "value": parent_value
+            }
+        ]
+        if parent_value is None or parent_value == '':
+            if DEBUG:
+                print("parent_value is blank")
+                print(parent)
+            continue
+        else:
+            if DEBUG:
+                print("parent_value = %s" % parent_value)
+
+        parent_field_values.append(parent_value)
+        if sort_field_id is not None:
+            sorting = [
+                {
+                    "fieldId": sort_field_id,
+                    "sortDirection": 0
+                }
+            ]
+        else:
+            sorting = None
+        sub_data = None
+        while sub_data is None:
+            sub_data = get_existing_cherwell_objects(service, configuration_item, page, fields, filters, sorting=sorting, check_duplicated=True)
+
+        data += sub_data
+
+    new_sources = []
+    for source in sources:
+        if source[parent_key] in parent_field_values:
+            new_sources.append(source)
+    print("source count = %d" % len(new_sources))
+    return data, new_sources
+
+
+def merge_existing_objects(firstItems, secondItems, key):
+    for secondItem in secondItems:
+        exist = False
+        for firstItem in firstItems:
+            if firstItem[key] == secondItem[key]:
+                exist = True
+                break
+        if not exist:
+            firstItems.append(secondItem)
+
+    return firstItems
+
+
+def get_existing_cherwell_objects(service, configuration_item, page, fields=None, filters=None, sorting=None, check_duplicated=False):
     """
     PageNumber essentialy means RowNumber
 
@@ -93,6 +171,10 @@ def get_existing_cherwell_objects(service, configuration_item, page, fields=None
         'includeAllFields': True,
         "pageSize": page_size
     }
+    if filters is not None:
+        bus_ib_pub_ids_request_data["filters"] = filters
+    if sorting is not None:
+        bus_ib_pub_ids_request_data["sorting"] = sorting
 
     if service.is_updated_page_number_version():
         bus_ib_pub_ids_request_data['pageNumber'] = (page - 1) * page_size + 1
@@ -107,21 +189,53 @@ def get_existing_cherwell_objects(service, configuration_item, page, fields=None
         bus_ib_pub_ids_request_data['includeAllFields'] = True
 
     data = []
+    total_rows = 0
     while True:
-        bus_ib_pub_ids = service.request('/api/V1/getsearchresults', 'POST', bus_ib_pub_ids_request_data)
-        data += bus_ib_pub_ids["businessObjects"]
-        print("Loaded {} of {} business objects".format(len(data), bus_ib_pub_ids["totalRows"]))
+        while True:
+            try:
+                bus_ib_pub_ids = service.request('/api/V1/getsearchresults', 'POST', bus_ib_pub_ids_request_data, silent=True)
+                if "businessObjects" not in bus_ib_pub_ids:
+                    raise Exception("Reponse is invalid")
+            except Exception as e:
+                import time
+                if DEBUG:
+                    print(str(e))
+                print("---Waiting 30 seconds---")
+                time.sleep(30)
+                continue
 
-        page += 1
+            if check_duplicated:
+                data = merge_existing_objects(data,  bus_ib_pub_ids["businessObjects"], 'busObRecId')
+            else:
+                data += bus_ib_pub_ids["businessObjects"]
+            total_rows = bus_ib_pub_ids["totalRows"]
+            print("Loaded {} of {} business objects".format(len(data), bus_ib_pub_ids["totalRows"]))
 
-        if service.is_updated_page_number_version():
-            if not(bus_ib_pub_ids["totalRows"] > (page - 1) * page_size):
-                break
-            bus_ib_pub_ids_request_data["pageNumber"] = (page - 1) * page_size + 1
-        else:
-            if not(bus_ib_pub_ids["totalRows"] > page * page_size):
-                break
-            bus_ib_pub_ids_request_data["pageNumber"] = page
+            if service.is_updated_page_number_version():
+                page += 1
+                if not(bus_ib_pub_ids["totalRows"] > (page - 1) * page_size):
+                    break
+                bus_ib_pub_ids_request_data["pageNumber"] = (page - 1) * page_size + 1
+            else:
+                if not(bus_ib_pub_ids["totalRows"] > page * page_size):
+                    break
+                page += 1
+                bus_ib_pub_ids_request_data["pageNumber"] = page
+
+        if not check_duplicated:
+            break
+
+        existing_objects_map = get_existing_cherwell_objects_map_by_field(data)
+        if len(existing_objects_map) == total_rows:
+            break
+
+        page = 1
+        bus_ib_pub_ids_request_data["pageNumber"] = page
+        if "sorting" in bus_ib_pub_ids_request_data and len(bus_ib_pub_ids_request_data["sorting"]) > 0:
+            if bus_ib_pub_ids_request_data["sorting"][0]["sortDirection"] == 0:
+                bus_ib_pub_ids_request_data["sorting"][0]["sortDirection"] = 1
+            else:
+                bus_ib_pub_ids_request_data["sorting"][0]["sortDirection"] = 0
 
     return data
 
@@ -142,6 +256,25 @@ def get_existing_cherwell_objects_map(data, full_objects=False):
                         "busObRecId": item["busObRecId"],
                     }
     print(cnt)
+    return result
+
+
+def get_existing_cherwell_objects_map_by_field(data, map_field="RecID", full_objects=False):
+    result = {}
+    cnt = 0
+    for item in data:
+        for field in item['fields']:
+            if field['name'] == map_field:
+                cnt += 1
+                if full_objects:
+                    result[field['value']] = item
+                    break
+                else:
+                    result[field['value']] = {
+                        "busObPublicId": item["busObPublicId"],
+                        "busObRecId": item["busObRecId"],
+                    }
+
     return result
 
 
@@ -187,24 +320,30 @@ def perform_butch_request(bus_object, mapping, match_map, _target, _resource, so
     }
 
     if doql:
-        for item in source[mapping.attrib['source']]:
-            batch["saveRequests"].append(
-                fill_business_object_doql(bus_object['fields'], item, configuration_item, match_map,
-                                          existing_objects_map,
-                                          mapping.attrib['key']))
+        chunk_size = 5000
+        for i in range(0, len(source[mapping.attrib['source']]), chunk_size):
+            chunk = source[mapping.attrib['source']][i:i + chunk_size]
+            batch["saveRequests"] = []
+            for item in chunk:
+                batch["saveRequests"].append(
+                    fill_business_object_doql(bus_object['fields'], item, configuration_item, match_map,
+                                              existing_objects_map,
+                                              mapping.attrib['key']))
 
-            batch["saveRequests"] = list(filter(None.__ne__, batch["saveRequests"]))
+                batch["saveRequests"] = list(filter(None.__ne__, batch["saveRequests"]))
 
-        response = target_api.request(_target.attrib['path'], 'POST', batch)
+            response = target_api.request(_target.attrib['path'], 'POST', batch)
 
-        if response["hasError"] and DEBUG:
-            print('error:', get_error_msg_from_response(response))
-            print('path:', _target.attrib['path'])
-            print('method:', 'POST')
-            print('payload:', batch)
-            print('response:', response)
-            return False
+            if response["hasError"] and DEBUG:
+                print('error:', get_error_msg_from_response(response))
+                print('path:', _target.attrib['path'])
+                print('method:', 'POST')
+                print('payload:', batch)
+                print('response:', response)
+                return False
     else:
+        if len(source[mapping.attrib['source']]) == 0:
+            return True
         for item in source[mapping.attrib['source']]:
             batch["saveRequests"].append(
                 fill_business_object(bus_object['fields'], item, configuration_item, match_map,
@@ -452,14 +591,15 @@ class CI:
 
             res += response.get('relatedBusinessObjects', [])
 
-            page += 1
             if self.cherwell_api.is_updated_page_number_version():
-                if not(response.get('totalRecords', 0) > (page - 1) * page_size):
+                page += 1
+                if not(response.get('totalRecords', 0) > (page-1) * page_size):
                     break
                 params["pageNumber"] = (page - 1) * page_size + 1
             else:
                 if not(response.get('totalRecords', 0) > page * page_size):
                     break
+                page += 1
                 params["pageNumber"] = page
 
         return res
@@ -760,9 +900,39 @@ def from_d42(source, mapping, _target, _resource, target_api, resource_api, conf
             mapping_source=mapping.attrib['source']
         )
 
+    parent_bus_ob_id = mapping.attrib.get('parent_bus_ob_id', None)
+    child_field_id = mapping.attrib.get('child_field_id', None)
+    parent_field = mapping.attrib.get('parent_field', None)
+    parent_key = mapping.attrib.get('parent_key', None)
+    sort_field_id = mapping.attrib.get('sort_field_id', None)
 
-    existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1)
+    if parent_bus_ob_id is not None and parent_bus_ob_id != "" and \
+                    child_field_id is not None and parent_field is not None and parent_key is not None:
+        if DEBUG:
+            print("parent_bus_ob_id = %s" % parent_bus_ob_id)
+            print("child_field_id = %s" % child_field_id)
+            print("parent_field = %s" % parent_field)
+            print("parent_key = %s" % parent_key)
+
+        parent_bus_ob_ids = [bus_ob_id.strip() for bus_ob_id in parent_bus_ob_id.split(",")]
+        existing_objects = []
+        new_source = copy.deepcopy(source)
+        new_source[mapping.attrib["source"]] = []
+        for parent_bus_ob_id in parent_bus_ob_ids:
+            if parent_bus_ob_id == "":
+                continue
+            sub_existing_objects, sub_source = get_existing_cherwell_objects_from_parent(target_api, configuration_item, 1, sources=source[mapping.attrib["source"]],
+                                                     parent_bus_ob_id=parent_bus_ob_id, child_field_id=child_field_id, parent_field=parent_field, parent_key=parent_key, sort_field_id=sort_field_id)
+
+            existing_objects += sub_existing_objects
+            new_source[mapping.attrib["source"]] += sub_source
+        source = new_source
+    else:
+        existing_objects = get_existing_cherwell_objects(target_api, configuration_item, 1)
     existing_objects_map = get_existing_cherwell_objects_map(existing_objects)
+    if DEBUG:
+        print(json.dumps(source))
+        print(json.dumps(existing_objects_map))
     bus_object = target_api.request('/api/V1/getbusinessobjecttemplate', 'POST', bus_object_config)
     success = perform_butch_request(bus_object, mapping, match_map, _target, _resource, source, existing_objects_map,
                           target_api,
@@ -779,6 +949,9 @@ def perform_delete_butch_request(_target, target_api, items_to_delete, bus_objec
         'stopOnError': DEBUG
     }
 
+    if len(items_to_delete) == 0:
+        return True
+
     for item in items_to_delete:
         batch['deleteRequests'].append({
             'busObId': bus_object_id,
@@ -788,7 +961,7 @@ def perform_delete_butch_request(_target, target_api, items_to_delete, bus_objec
 
     response = target_api.request(_target.attrib['path'], 'POST', batch)
 
-    if response['hasError'] and DEBUG:
+    if 'hasError' in response and response['hasError'] and DEBUG:
         print('error:', get_error_msg_from_response(response))
         print('path:', _target.attrib['path'])
         print('method:', 'POST')
