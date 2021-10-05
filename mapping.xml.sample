@@ -290,63 +290,86 @@
                         doql="
 select
     da.dependency_device_fk,
-    sa.dependency_serviceinstance_fk,
-    sa.dependency_serviceinstance_name,
-    saac1.dependency_appcomp_fk,
-    saac1.dependency_appcomp_name,
-    ac1.device_fk dependency_appcomp_device_fk,
+    sa.dependency_serviceinstance_fk as dependency_instance_fk,
+    sa.dependency_serviceinstance_name as dependency_instance_name,
     da.dependent_device_fk,
-    sa.dependent_serviceinstance_fk,
-    sa.dependent_serviceinstance_name,
-    saac2.dependent_appcomp_fk,
-    saac2.dependent_appcomp_name,
-    ac2.device_fk dependent_appcomp_device_fk
+    sa.dependent_serviceinstance_fk as dependent_instance_fk,
+    sa.dependent_serviceinstance_name as dependent_instance_name
 from view_deviceaffinity_v2 da
     left join view_serviceaffinity_v2 sa on sa.deviceaffinity_fk = da.deviceaffinity_pk
-    left join view_serviceaffinitydependencyappcomps_v2 saac1 on saac1.serviceaffinity_fk = sa.serviceaffinity_pk
-    left join view_appcomp_v1 ac1 on ac1.appcomp_pk = saac1.dependency_appcomp_fk
-    left join view_serviceaffinitydependentappcomps_v2 saac2 on saac2.serviceaffinity_fk = sa.serviceaffinity_pk
-    left join view_appcomp_v1 ac2 on ac2.appcomp_pk = saac2.dependent_appcomp_fk
 where da.effective_to is null and sa.effective_to is null
 "
                 ></resource>
             </api>
 
-            <configuration-item d42-model="serviceinstance" bus-ob-id="9442246ac40b91c673fee447c8bc902991437a8ded">
-                <downstream-relationship d42-model="serviceinstance"
+            <configuration-item d42-model="instance" bus-ob-id="946717e2abd19acd74126b463e90e633b538fff1f6">
+                <downstream-relationship d42-model="instance"
+                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
+                <downstream-relationship d42-model="device"
                                          id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
 
-                <mapping key="serviceinstance_pk">
-                    <field resource="name" type="string" target="FriendlyName"/>
-                    <field resource="serviceinstance_pk" type="string" target="U_device42_id"/>
-                    <field resource="serviceinstance_pk" url="https://10.42.42.60/admin/rackraj/servicedetail/{}/" type="string" target="U_device42_url"/>
+                <mapping key="instance_fk">
+                    <field resource="instance_name" type="string" target="FriendlyName"/>
+                    <field resource="instance_fk" type="string" target="U_device42_id"/>
+                    <field resource="instance_fk" url="https://10.42.42.60/admin/rackraj/servicedetail/{}/" type="string" target="U_device42_url"/>
                 </mapping>
-            </configuration-item>
-
-            <configuration-item d42-model="appcomp" bus-ob-id="94422728aff1c320e3dec84c52a721f365363973e2">
-                <downstream-relationship d42-model="serviceinstance"
-                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
-
-                <mapping key="appcomp_pk">
-                    <field resource="name" type="string" target="FriendlyName"/>
-                    <field resource="appcomp_pk" type="string" target="U_device42_id"/>
-                    <field resource="appcomp_pk" url="https://10.42.42.60/admin/rackraj/appcomp/{}/" type="string" target="U_device42_url"/>
-                </mapping>
-            </configuration-item>
-
-            <configuration-item d42-model="device" bus-ob-id="9343f947d5000ac81406e746f0975ddeb11c184480">
-                <downstream-relationship d42-model="serviceinstance"
-                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
-                <downstream-relationship d42-model="appcomp"
-                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
             </configuration-item>
 
             <configuration-item d42-model="device" bus-ob-id="93dada9f640056ce1dc67b4d4bb801f69104894dc8">
-                <downstream-relationship d42-model="serviceinstance"
-                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
-                <downstream-relationship d42-model="appcomp"
+                <downstream-relationship d42-model="instance"
                                          id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
             </configuration-item>
+
+        </task>
+
+        <task enable="false" type="business_app" reset-connections="true"
+              description="Copy Business App data from Device42 to Cherwell">
+            <api>
+                <target target="cherwell" method="POST" update_method="PATCH"
+                        path="/api/V1/savebusinessobjectbatch"/>
+
+                <resource
+                        target="device42"
+                        method="POST"
+                        extra-filter=""
+                        path="/services/data/v1.0/query/?"
+                        doql="
+select
+                                       case connection_type when 'reversed' then be1.device_fk else be2.device_fk end as dependency_device_fk,
+                                       case connection_type when 'reversed' then be1.businessapplication_fk else be2.businessapplication_fk end as dependency_instance_fk,
+                                       case connection_type when 'reversed' then ba1.name else ba2.name end as dependency_instance_name,
+                                       case connection_type when 'reversed' then be2.device_fk else be1.device_fk end as dependent_device_fk,
+                                       case connection_type when 'reversed' then be2.businessapplication_fk else be1.businessapplication_fk end as dependent_instance_fk,
+                                       case connection_type when 'reversed' then ba2.name else ba1.name end as dependent_instance_name
+                                from view_businessapplicationconnection_v1 bc
+                                join view_businessapplicationelement_v1 be1 on bc.from_businessapplicationelement_fk = be1.businessapplicationelement_pk
+                                join view_businessapplication_v1 ba1 on be1.businessapplication_fk = ba1.businessapplication_pk
+                                inner join view_device_v1 d1 on be1.device_fk = d1.device_pk
+                                join view_businessapplicationelement_v1 be2 on bc.to_businessapplicationelement_fk = be2.businessapplicationelement_pk
+                                inner join view_device_v1 d2 on be2.device_fk = d2.device_pk
+                                join view_businessapplication_v1 ba2 on be2.businessapplication_fk = ba2.businessapplication_pk
+"
+                ></resource>
+            </api>
+
+            <configuration-item d42-model="instance" bus-ob-id="946717dfc96b3cceb3764249a89a819879b1ead022">
+                <downstream-relationship d42-model="instance"
+                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
+                <downstream-relationship d42-model="device"
+                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
+
+                <mapping key="instance_fk">
+                    <field resource="instance_name" type="string" target="FriendlyName"/>
+                    <field resource="instance_fk" type="string" target="U_device42_id"/>
+                    <field resource="instance_fk" url="https://10.42.42.60/admin/rackraj/servicedetail/{}/" type="string" target="U_device42_url"/>
+                </mapping>
+            </configuration-item>
+
+            <configuration-item d42-model="device" bus-ob-id="93dada9f640056ce1dc67b4d4bb801f69104894dc8">
+                <downstream-relationship d42-model="instance"
+                                         id="93982dbca493a2b8fb8d874b29a8272912de2039fb"></downstream-relationship>
+            </configuration-item>
+
         </task>
 
     </tasks>
